@@ -13,7 +13,7 @@
 
 import tensorflow as tf
 import numpy as np
-from news_classification.title_tf_ft_model import fastText
+from tf_model.fasttext_model import fastText
 from tflearn.data_utils import pad_sequences
 import os
 import codecs

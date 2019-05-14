@@ -11,13 +11,24 @@
 import tensorflow as tf
 
 
-class fastText:
+class fastText(object):
     
-    def __init__(self, label_size, learning_rate, decay_rate, decay_steps, batch_size, num_sampled, title_len, vocab_size, embed_size, is_training):
+    def __init__(self,
+                 label_size,
+                 learning_rate,
+                 learning_decay_rate,
+                 learning_decay_steps,
+                 batch_size,
+                 num_sampled,
+                 title_len,
+                 vocab_size,
+                 embed_size,
+                 is_training):
         self.label_size = label_size  # num of classes
         self.learning_rate = learning_rate
-        self.decay_rate = decay_rate
-        self.decay_steps = decay_steps
+        self.learning_rate = learning_rate
+        self.learning_decay_rate = learning_decay_rate
+        self.learning_decay_steps = learning_decay_steps
         self.vocab_size = vocab_size
         self.embed_size = embed_size
         self.batch_size = batch_size
@@ -25,7 +36,7 @@ class fastText:
         self.title_len = title_len
         self.is_training = is_training
 
-        self.title = tf.placeholder(tf.int32, [None, self.title_len], name="sentence")   # X
+        self.text = tf.placeholder(tf.int32, [None, self.title_len], name="text")   # X
         self.label = tf.placeholder(tf.int64, [None, ], name="label")  # Y
 
         self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
@@ -47,7 +58,7 @@ class fastText:
 
     def inference(self):
         """计算图：embedding -> average -> linear classifier"""
-        title_embeddings = tf.nn.embedding_lookup(self.embedding, self.title)
+        title_embeddings = tf.nn.embedding_lookup(self.embedding, self.text)
         self.title_embeddings = tf.reduce_mean(title_embeddings, axis=1)
         logits = tf.matmul(self.title_embeddings, self.w) + self.b
         return logits
@@ -78,8 +89,8 @@ class fastText:
         return loss
 
     def train(self):
-        learining_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-                                                    self.decay_rate, staircase=True)
+        learining_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.learning_decay_steps,
+                                                    self.learning_decay_rate, staircase=True)
         train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step,
                                                    learning_rate=learining_rate, optimizer="Adam")
         return train_op
