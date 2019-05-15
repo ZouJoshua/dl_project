@@ -30,7 +30,7 @@ class fastText(object):
         self.learning_decay_rate = learning_decay_rate
         self.learning_decay_steps = learning_decay_steps
         self.vocab_size = vocab_size
-        self.embed_size = embed_size
+        self.embedding_dim = embed_size
         self.batch_size = batch_size
         self.num_sampled = num_sampled
         self.title_len = title_len
@@ -47,20 +47,27 @@ class fastText(object):
         self.logits = self.inference()
         self.loss_val = self.loss()
         self.train_op = self.train()
-        self.predictions = tf.argmax(self.logits, axis=1, name="predictions")
-        correct_predictions = tf.equal(tf.cast(self.predictions, tf.int64), self.label)
-        self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32), name="accuracy")
+        self.accuracy = self.acc()
 
     def init_weights(self):
-        self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embed_size])
-        self.w = tf.get_variable("w", [self.embed_size, self.label_size])
+        with tf.name_scope("embedding"):
+            self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dim])
+        self.w = tf.get_variable("w", [self.embedding_dim, self.label_size])
         self.b = tf.get_variable("b", [self.label_size])
 
     def inference(self):
         """计算图：embedding -> average -> linear classifier"""
-        title_embeddings = tf.nn.embedding_lookup(self.embedding, self.text)
-        self.title_embeddings = tf.reduce_mean(title_embeddings, axis=1)
-        logits = tf.matmul(self.title_embeddings, self.w) + self.b
+        embedding_inputs = tf.nn.embedding_lookup(self.embedding, self.text)
+
+        with tf.name_scope("dropout"):
+            dropout_output = tf.nn.dropout(embedding_inputs, self.dropout_keep_prob)
+
+        # 对词向量进行平均
+        with tf.name_scope("average"):
+            # self.inputs_embeddings = tf.reduce_mean(dropout_output, axis=1)
+            self.inputs_embeddings = tf.reduce_mean(embedding_inputs, axis=1)
+        # 输出层
+        logits = tf.matmul(self.inputs_embeddings, self.w) + self.b
         return logits
 
     def loss(self, l2_lambda=0.0001):
@@ -72,7 +79,7 @@ class fastText(object):
                 tf.nn.nce_loss(weights=tf.transpose(self.w),
                                biases=self.b,
                                labels=labels,
-                               inputs=self.title_embeddings,
+                               inputs=self.inputs_embeddings,
                                num_sampled=self.num_sampled,
                                num_classes=self.label_size,
                                partition_strategy="div")
@@ -87,6 +94,13 @@ class fastText(object):
         l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
         loss = loss + l2_losses
         return loss
+
+    def acc(self):
+        with tf.name_scope('accuracy'):
+            self.predictions = tf.argmax(self.logits, axis=1, name="predictions")
+            correct_predictions = tf.equal(tf.cast(self.predictions, tf.int64), self.label)
+            accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32), name="accuracy")
+        return accuracy
 
     def train(self):
         learining_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.learning_decay_steps,

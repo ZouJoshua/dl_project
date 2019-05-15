@@ -17,23 +17,23 @@ from tf_model.fasttext_model import fastText
 from tflearn.data_utils import pad_sequences
 import os
 import codecs
-from preprocess.util import create_label_vocabulary, create_vocabulary, load_final_test_data, load_data_predict
+from preprocess.preprocess_data import create_label_vocabulary, create_vocabulary, load_final_test_data, load_data_predict
 
-FLAGS=tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer("label_size", 15, "number of label")
-tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
-tf.app.flags.DEFINE_integer("decay_steps", 5000, "how many steps before decay learning rate.")  # 批处理的大小 32-->128
-tf.app.flags.DEFINE_float("decay_rate", 0.5, "Rate of decay for learning rate.")
-tf.app.flags.DEFINE_integer("num_sampled", 10, "number of noise sampling")
-tf.app.flags.DEFINE_string("ckpt_dir", "data/news_classification/fasttext/fasttext_checkpoint/", "checkpoint location for the model")
-tf.app.flags.DEFINE_integer("title_len", 300, "max title length")
-tf.app.flags.DEFINE_integer("embed_size", 100, "embedding size")
-tf.app.flags.DEFINE_boolean("is_training", False, "is traning.true:tranining,false:testing/inference")
-tf.app.flags.DEFINE_integer("num_epochs", 15, "embedding size")
-tf.app.flags.DEFINE_integer("validate_every", 3, "Validate every validate_every epochs.")  # 每3轮做一次验证
-tf.app.flags.DEFINE_string("predict_target_file", "data/news_classification/fasttext/fasttext_checkpoint/predict_target", "target file path for final prediction")
-tf.app.flags.DEFINE_string("predict_source_file", 'data/news_classification/fasttext/fasttext_checkpoint/predict_source', "target file path for final prediction")
+FLAGS=tf.flags.FLAGS
+tf.flags.DEFINE_integer("label_size", 15, "number of label")
+tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
+tf.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
+tf.flags.DEFINE_integer("decay_steps", 5000, "how many steps before decay learning rate.")  # 批处理的大小 32-->128
+tf.flags.DEFINE_float("decay_rate", 0.5, "Rate of decay for learning rate.")
+tf.flags.DEFINE_integer("num_sampled", 10, "number of noise sampling")
+tf.flags.DEFINE_string("ckpt_dir", "data/news_classification/fasttext/fasttext_checkpoint/", "checkpoint location for the model")
+tf.flags.DEFINE_integer("title_len", 300, "max title length")
+tf.flags.DEFINE_integer("embed_size", 100, "embedding size")
+tf.flags.DEFINE_boolean("is_training", False, "is traning.true:tranining,false:testing/inference")
+tf.flags.DEFINE_integer("num_epochs", 15, "embedding size")
+tf.flags.DEFINE_integer("validate_every", 3, "Validate every validate_every epochs.")  # 每3轮做一次验证
+tf.flags.DEFINE_string("predict_target_file", "data/news_classification/fasttext/fasttext_checkpoint/predict_target", "target file path for final prediction")
+tf.flags.DEFINE_string("predict_source_file", 'data/news_classification/fasttext/fasttext_checkpoint/predict_source', "target file path for final prediction")
 
 
 def main(_):

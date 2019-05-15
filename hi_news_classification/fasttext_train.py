@@ -15,22 +15,22 @@ from tf_model.fasttext_model import fastText
 from tflearn.data_utils import pad_sequences
 from gensim.models import KeyedVectors
 from preprocess.util import create_vocabulary, load_data, create_label_vocabulary
-from classification.python.client import timeline
 
-FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer("label_size", 15, "number of label")
-tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
-tf.app.flags.DEFINE_integer("decay_steps", 20000, "how many steps before decay learning rate")
-tf.app.flags.DEFINE_float("decay_rate", 0.8, "Rate of decay for learning rate")  # 一次衰减多少
-tf.app.flags.DEFINE_integer("num_sampled", 10, "number of noise sampling")
-tf.app.flags.DEFINE_string("ckpt_dir", "/data/news_classification/fasttext/fasttext_checkpoint/", "checkpoint location for the model")
-tf.app.flags.DEFINE_integer("title_len", 200, "max title length")
-tf.app.flags.DEFINE_integer("embed_size", 300, "embedding size")
-tf.app.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
-tf.app.flags.DEFINE_integer("num_epochs", 15, "epoch times")
-tf.app.flags.DEFINE_integer("validate_every", 10, "validate every validate_every epochs")  # 每10轮做一次验证
-tf.app.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
+
+FLAGS = tf.flags.FLAGS
+tf.flags.DEFINE_integer("label_size", 15, "number of label")
+tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
+tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
+tf.flags.DEFINE_integer("decay_steps", 20000, "how many steps before decay learning rate")
+tf.flags.DEFINE_float("decay_rate", 0.8, "Rate of decay for learning rate")  # 一次衰减多少
+tf.flags.DEFINE_integer("num_sampled", 10, "number of noise sampling")
+tf.flags.DEFINE_string("ckpt_dir", "/data/news_classification/fasttext/fasttext_checkpoint/", "checkpoint location for the model")
+tf.flags.DEFINE_integer("title_len", 200, "max title length")
+tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
+tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
+tf.flags.DEFINE_integer("num_epochs", 15, "epoch times")
+tf.flags.DEFINE_integer("validate_every", 10, "validate every validate_every epochs")  # 每10轮做一次验证
+tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
 # tf.app.flags.DEFINE_string("cache_path", "fast_text_checkpoint/data_cache.pik", "checkpoint location for the model")
 
 content_word_vector_path = "/data/news_content/content_word_vector.bin"
