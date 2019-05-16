@@ -47,7 +47,7 @@ def get_word2vec_corpus(file):
     return doc_word_list
 
 
-def train_word2vec_embed_by_gensim(doc_word_list, save_path, model_file="word2vec.model", word2vec_file="word2vec.bin"):
+def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="word2vec.model", word2vec_file="word2vec.bin"):
     """
     gensim训练词向量
     :param doc_word_list:
