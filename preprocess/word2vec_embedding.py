@@ -63,9 +63,9 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path, model_file="word2ve
     print("<<<<< 词向量embedding已保存【{}】".format(vector_path))
 
 def main():
-    corpus_data_path = "/data/in_hi_news/raw_data/raw_data"
+    # corpus_data_path = "/data/in_hi_news/raw_data/raw_data"
+    corpus_data_path = "/data/zoushuai/hi_news/raw_data"
     file = os.path.join(corpus_data_path, "part-00000-69676dc0-8d50-4410-864d-79709f3f4960-c000.json")
-    # corpus_data_path = "/data/zoushuai/hi_news/raw_data"
     # doc_word_list_all = list()
     # for file in os.listdir(corpus_data_path):
     #     if file.startswith("part"):
