@@ -11,8 +11,8 @@
 import os
 import time
 from gensim.models import word2vec
-from preprocess.preprocess_data import split_text
-from preprocess.preprocess_data import read_json_format_file
+from .preprocess_data import split_text
+from .preprocess_data import read_json_format_file
 
 
 def get_word2vec_corpus(file):
