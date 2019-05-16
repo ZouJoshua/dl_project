@@ -11,6 +11,7 @@
 import os
 import time
 from gensim.models import word2vec
+import random
 
 import sys
 cwd = os.path.realpath(__file__)
@@ -73,15 +74,17 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
 def main():
     # corpus_data_path = "/data/in_hi_news/raw_data/raw_data"
     corpus_data_path = "/data/zoushuai/hi_news/raw_data"
-    file = os.path.join(corpus_data_path, "part-00000-69676dc0-8d50-4410-864d-79709f3f4960-c000.json")
-    # doc_word_list_all = list()
-    # for file in os.listdir(corpus_data_path):
-    #     if file.startswith("part"):
-    #         doc_word_list = get_word2vec_corpus(file)
-    #         doc_word_list_all += doc_word_list
-    doc_word_list_all = get_word2vec_corpus(file)
+    # file = os.path.join(corpus_data_path, "part-00000-69676dc0-8d50-4410-864d-79709f3f4960-c000.json")
+    doc_word_list_all = list()
+    for file in os.listdir(corpus_data_path):
+        if file.startswith("part"):
+            doc_word_list = get_word2vec_corpus(file)
+            doc_word_list_all += doc_word_list
+    # doc_word_list_all = get_word2vec_corpus(file)
+    random.shuffle(doc_word_list_all)
+    print(">>>>> 开始训练词向量")
     s = time.time()
-    train_word2vec_embed_by_gensim(doc_word_list_all)
+    train_word2vec_embed_by_gensim(doc_word_list_all[:2400000])
     e = time.time()
     print(">>>>> 训练{}篇文档词向量耗时{}".format(len(doc_word_list_all), e-s))
 
