@@ -30,7 +30,7 @@ class fastText(object):
         self.learning_decay_rate = learning_decay_rate
         self.learning_decay_steps = learning_decay_steps
         self.vocab_size = vocab_size
-        self.embedding_dim = embed_size
+        self.embedding_dims = embed_size
         self.batch_size = batch_size
         self.num_sampled = num_sampled
         self.title_len = title_len
@@ -51,8 +51,8 @@ class fastText(object):
 
     def init_weights(self):
         with tf.name_scope("embedding"):
-            self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dim])
-        self.w = tf.get_variable("w", [self.embedding_dim, self.label_size])
+            self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dims])
+        self.w = tf.get_variable("w", [self.embedding_dims, self.label_size])
         self.b = tf.get_variable("b", [self.label_size])
 
     def inference(self):

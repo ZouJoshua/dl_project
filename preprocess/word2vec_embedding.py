@@ -34,7 +34,7 @@ def get_word2vec_corpus(file):
     _doc_count = 0
     for doc in read_json_format_file(file):
         _doc_count += 1
-        if _doc_count % 100000 ==0:
+        if _doc_count % 100000 == 0:
             print(">>>>> 已处理{}篇文档".format(_doc_count))
         if 'title' and 'content' in doc.keys():
             title = doc["title"].strip().replace("\t", "").replace("\n", "").replace("\r", "")
@@ -64,7 +64,7 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
         model_path = model_file
         vector_path = word2vec_file
     print(">>>>> 正在使用skip gram模型训练词向量")
-    model = word2vec.Word2Vec(doc_word_list, size=300, workers=4, sg=1, iter=50)  # 默认训练词向量的时候把频次小于5的单词从词汇表中剔除掉
+    model = word2vec.Word2Vec(doc_word_list, size=300, workers=8, sg=1, iter=50)  # 默认训练词向量的时候把频次小于5的单词从词汇表中剔除掉
     model.save(model_path)
     model.wv.save_word2vec_format(vector_path, binary=True)
     print("<<<<< 词向量模型已保存【{}】".format(model_path))
