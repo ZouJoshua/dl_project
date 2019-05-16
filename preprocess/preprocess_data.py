@@ -44,5 +44,9 @@ def split_text(text, lower=True, stop=None):
     _text = text
     if lower:
         _text = text.lower()
+    if stop:
+        for i in stop:
+            _text = _text.replace(i, "")
     word_list = _text.split()
     return word_list
+
