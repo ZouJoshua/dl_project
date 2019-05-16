@@ -15,7 +15,7 @@ from gensim.models import word2vec
 import sys
 cwd = os.path.realpath(__file__)
 root_dir = os.path.dirname(os.path.dirname(cwd))
-sys.path.append(os.path.join(root_dir, cwd))
+sys.path.append(os.path.join(root_dir, "preprocess"))
 
 from preprocess.preprocess_data import split_text
 from preprocess.preprocess_data import read_json_format_file
