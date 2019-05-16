@@ -76,8 +76,9 @@ def main():
     corpus_data_path = "/data/zoushuai/hi_news/raw_data"
     # file = os.path.join(corpus_data_path, "part-00000-69676dc0-8d50-4410-864d-79709f3f4960-c000.json")
     doc_word_list_all = list()
-    for file in os.listdir(corpus_data_path):
-        if file.startswith("part"):
+    for _file in os.listdir(corpus_data_path):
+        if _file.startswith("part"):
+            file = os.path.join(corpus_data_path, _file)
             doc_word_list = get_word2vec_corpus(file)
             doc_word_list_all += doc_word_list
     # doc_word_list_all = get_word2vec_corpus(file)
