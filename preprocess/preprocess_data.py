@@ -30,6 +30,23 @@ def read_json_format_file(file):
                 line = json.loads(_line)
                 yield line
 
+def read_txt_file(file):
+    """
+    读取txt格式的文本
+    :param file:
+    :return:
+    """
+    if not os.path.exists(file):
+        raise FileNotFoundError("【{}】文件未找到，请检查".format(file))
+    print(">>>>> 正在读原始取数据文件：{}".format(file))
+    with open(file, 'r') as f:
+        while True:
+            _line = f.readline()
+            if not _line:
+                break
+            else:
+                yield _line.strip()
+
 
 def get_text_from_html(html):
     """
