@@ -20,8 +20,8 @@ root_dir = os.path.dirname(os.path.dirname(cwd))
 sys.path.append(root_dir)
 sys.path.append(os.path.join(root_dir, "preprocess"))
 
-from preprocess.preprocess_data import split_text
-from preprocess.preprocess_data import read_json_format_file,read_txt_file
+from preprocess.preprocess_utils import split_text
+from preprocess.preprocess_utils import read_json_format_file, read_txt_file
 
 
 
@@ -120,6 +120,10 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
     model.wv.save_word2vec_format(vector_path, binary=True)
     print("<<<<< 词向量模型已保存【{}】".format(model_path))
     print("<<<<< 词向量embedding已保存【{}】".format(vector_path))
+
+
+
+
 
 def main():
     # corpus_data_path = "/data/in_hi_news/raw_data/raw_data"

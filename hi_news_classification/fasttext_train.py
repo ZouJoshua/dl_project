@@ -14,7 +14,7 @@ import os
 from tf_model.fasttext_model import fastText
 from tflearn.data_utils import pad_sequences
 from gensim.models import KeyedVectors
-from preprocess.util import create_vocabulary, load_data, create_label_vocabulary
+from preprocess.datasets import DataSet
 
 
 FLAGS = tf.flags.FLAGS

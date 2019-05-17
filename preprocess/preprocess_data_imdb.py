@@ -65,6 +65,42 @@ def generate_word2vec(embed_file, out_dir, vec_bin="word2Vec.bin"):
     print("<<<<< 词向量【{}】已训练完成".format(vec_bin))
 
 
+# 配置参数
+
+class TrainingConfig(object):
+    epoches = 10
+    evaluateEvery = 100
+    checkpointEvery = 100
+    learningRate = 0.001
+
+
+class ModelConfig(object):
+    embeddingSize = 200
+    numFilters = 128
+
+    filterSizes = [2, 3, 4, 5]
+    dropoutKeepProb = 0.5
+    l2RegLambda = 0.0
+
+
+class Config(object):
+    sequenceLength = 200  # 取了所有序列长度的均值
+    batchSize = 128
+
+    dataSource = "../data/preProcess/labeledTrain.csv"
+
+    stopWordSource = "../data/imdb_stopwords.txt"
+
+    numClasses = 2
+
+    rate = 0.8  # 训练集的比例
+
+    training = TrainingConfig()
+
+    model = ModelConfig()
+
+
+
 class Dataset(object):
     def __init__(self, config):
         self._dataSource = config.dataSource
@@ -245,6 +281,14 @@ def main():
     embed_file = os.path.join(out_dir, "embedding.txt")
     # get_clean_and_embed_file(label_file, unlabel_file, embed_file, train_file)
     generate_word2vec(embed_file, out_dir)
+
+    config = Config()
+    data = Dataset(config)
+    data.dataGen()
+
+    print("train data shape: {}".format(data.trainReviews.shape))
+    print("train label shape: {}".format(data.trainLabels.shape))
+    print("eval data shape: {}".format(data.evalReviews.shape))
 
 if __name__ == '__main__':
     main()

@@ -5,3 +5,4 @@ gensim==3.4.0
 fasttext==0.8.3
 pandas==0.24.2
 bs4==0.0.1
+msgpack==0.6.1
