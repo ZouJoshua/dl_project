@@ -40,7 +40,7 @@ model_path = "/data/news_content/word2vec_content_model"
 def main(_):
     """导入数据 -> 创建session -> 喂数据 -> 训练 -> (验证) ->（预测）"""
 
-    vocabulary_word2idx, vocabulary_idx2word = create_vocabulary(model_path)
+    vocabulary_word2idx, vocabulary_idx2word = DataSet(model_path).create_vocabulary()
     vocab_size = len(vocabulary_word2idx)
     label2idx, _ = create_label_vocabulary()
     train, test, _ = load_data(vocabulary_word2idx, label2idx)

@@ -11,13 +11,18 @@ import os
 import pandas as pd
 from bs4 import BeautifulSoup
 
-import logging
+
 import gensim
 from gensim.models import word2vec
 
 import numpy as np
 from collections import Counter
 import json
+
+import logging
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+
 
 
 def getRate(subject):
@@ -87,9 +92,9 @@ class Config(object):
     sequenceLength = 200  # 取了所有序列长度的均值
     batchSize = 128
 
-    dataSource = "../data/preProcess/labeledTrain.csv"
+    dataSource = "../data/imdb/processedData/labeledTrain.csv"
 
-    stopWordSource = "../data/imdb_stopwords.txt"
+    stopWordSource = "../data/imdb/imdb_stopwords.txt"
 
     numClasses = 2
 
@@ -205,10 +210,10 @@ class Dataset(object):
         self._indexToWord = dict(zip(list(range(len(vocab))), vocab))
 
         # 将词汇-索引映射表保存为json数据，之后做inference时直接加载来处理数据
-        with open("../data/wordJson/wordToIndex.json", "w", encoding="utf-8") as f:
+        with open("../data/imdb/processedData/wordToIndex.json", "w", encoding="utf-8") as f:
             json.dump(self._wordToIndex, f)
 
-        with open("../data/wordJson/indexToWord.json", "w", encoding="utf-8") as f:
+        with open("../data/imdb/processedData/indexToWord.json", "w", encoding="utf-8") as f:
             json.dump(self._indexToWord, f)
 
     def _getWordEmbedding(self, words):
@@ -216,7 +221,7 @@ class Dataset(object):
         按照我们的数据集中的单词取出预训练好的word2vec中的词向量
         """
 
-        wordVec = gensim.models.KeyedVectors.load_word2vec_format("../word2vec/word2Vec.bin", binary=True)
+        wordVec = gensim.models.KeyedVectors.load_word2vec_format("../data/imdb/processedData/word2Vec.bin", binary=True)
         vocab = []
         wordEmbedding = []
 
@@ -270,6 +275,12 @@ class Dataset(object):
         self.evalLabels = evalLabels
 
 
+
+
+
+
+
+
 def main():
     data_dir = "/home/zoushuai/algoproject/tf_project/data/imdb/rawData"
     label_file = os.path.join(data_dir, 'labeledTrainData.tsv')
@@ -280,7 +291,7 @@ def main():
     train_file = os.path.join(out_dir, "labeledTrain.csv")
     embed_file = os.path.join(out_dir, "embedding.txt")
     # get_clean_and_embed_file(label_file, unlabel_file, embed_file, train_file)
-    generate_word2vec(embed_file, out_dir)
+    # generate_word2vec(embed_file, out_dir)
 
     config = Config()
     data = Dataset(config)

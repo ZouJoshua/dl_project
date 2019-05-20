@@ -107,7 +107,11 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
     :param word2vec_file:
     :return:
     """
-    #skip gram
+    # 引入日志配置
+    import logging
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+    #skip gram（预测更准确些）
     if save_path:
         model_path = os.path.join(save_path, model_file)
         vector_path = os.path.join(save_path, word2vec_file)
@@ -120,7 +124,6 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
     model.wv.save_word2vec_format(vector_path, binary=True)
     print("<<<<< 词向量模型已保存【{}】".format(model_path))
     print("<<<<< 词向量embedding已保存【{}】".format(vector_path))
-
 
 
 
