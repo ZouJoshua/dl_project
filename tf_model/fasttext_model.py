@@ -20,7 +20,8 @@ class fastText(object):
                  learning_decay_steps,
                  batch_size,
                  num_sampled,
-                 title_len,
+                 dropout_keep_prob,
+                 sentence_len,
                  vocab_size,
                  embed_size,
                  is_training):
@@ -30,14 +31,15 @@ class fastText(object):
         self.learning_decay_rate = learning_decay_rate
         self.learning_decay_steps = learning_decay_steps
         self.vocab_size = vocab_size
+        self.dropout_keep_prob = dropout_keep_prob
         self.embedding_dims = embed_size
         self.batch_size = batch_size
         self.num_sampled = num_sampled
-        self.title_len = title_len
+        self.sentence_len = sentence_len
         self.is_training = is_training
 
-        self.text = tf.placeholder(tf.int32, [None, self.title_len], name="text")   # X
-        self.label = tf.placeholder(tf.int64, [None, ], name="label")  # Y
+        self.sentence = tf.placeholder(tf.float32, [None, self.sentence_len], name="sentence")   # X
+        self.label = tf.placeholder(tf.int32, [None], name="label")  # Y
 
         self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
         self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
@@ -57,7 +59,7 @@ class fastText(object):
 
     def inference(self):
         """计算图：embedding -> average -> linear classifier"""
-        embedding_inputs = tf.nn.embedding_lookup(self.embedding, self.text)
+        embedding_inputs = tf.nn.embedding_lookup(self.embedding, self.sentence)
 
         with tf.name_scope("dropout"):
             dropout_output = tf.nn.dropout(embedding_inputs, self.dropout_keep_prob)
