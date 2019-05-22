@@ -38,7 +38,7 @@ class fastText(object):
         self.sentence_len = sentence_len
         self.is_training = is_training
 
-        self.sentence = tf.placeholder(tf.float32, [None, self.sentence_len], name="sentence")   # X
+        self.sentence = tf.placeholder(tf.int32, [None, self.sentence_len], name="sentence")   # X
         self.label = tf.placeholder(tf.int32, [None], name="label")  # Y
 
         self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
@@ -47,7 +47,7 @@ class fastText(object):
 
         self.init_weights()
         self.logits = self.inference()
-        self.loss_val = self.loss()
+        self.loss_val = self.l2_loss()
         self.train_op = self.train()
         self.accuracy = self.acc()
 
@@ -67,12 +67,12 @@ class fastText(object):
         # 对词向量进行平均
         with tf.name_scope("average"):
             # self.inputs_embeddings = tf.reduce_mean(dropout_output, axis=1)
-            self.inputs_embeddings = tf.reduce_mean(embedding_inputs, axis=1)
+            self.embeddings_output = tf.reduce_mean(embedding_inputs, axis=1)
         # 输出层
-        logits = tf.matmul(self.inputs_embeddings, self.w) + self.b
+        logits = tf.matmul(self.embeddings_output, self.w) + self.b
         return logits
 
-    def loss(self, l2_lambda=0.0001):
+    def nce_loss(self, l2_lambda=0.001):
         """计算NCE交叉熵损失"""
         if self.is_training:
             labels = tf.reshape(self.label, [-1])
@@ -81,7 +81,7 @@ class fastText(object):
                 tf.nn.nce_loss(weights=tf.transpose(self.w),
                                biases=self.b,
                                labels=labels,
-                               inputs=self.inputs_embeddings,
+                               inputs=self.embeddings_output,
                                num_sampled=self.num_sampled,
                                num_classes=self.label_size,
                                partition_strategy="div")
@@ -97,10 +97,21 @@ class fastText(object):
         loss = loss + l2_losses
         return loss
 
+    def l2_loss(self, l2_lambda=0.001):
+        labels_one_hot = tf.one_hot(self.label, self.label_size)
+        loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(
+            labels=labels_one_hot, logits=self.logits), axis=1)
+        # losses = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits))
+        # losses = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label, logits=self.logits))
+        l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
+        loss = loss + l2_losses
+        return loss
+
+
     def acc(self):
         with tf.name_scope('accuracy'):
             self.predictions = tf.argmax(self.logits, axis=1, name="predictions")
-            correct_predictions = tf.equal(tf.cast(self.predictions, tf.int64), self.label)
+            correct_predictions = tf.equal(tf.cast(self.predictions, tf.int32), self.label)
             accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32), name="accuracy")
         return accuracy
 

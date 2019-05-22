@@ -28,9 +28,12 @@ cache_file_h5py = os.path.join(data_dir, "data.h5")
 cache_file_pickle = os.path.join(data_dir, "vocab_label.pik")
 output_dir = os.path.join(data_dir, "summarys")
 
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_string("cache_file_h5py", cache_file_h5py,"path of training/validation/test data.")
+tf.flags.DEFINE_string("cache_file_h5py", cache_file_h5py, "path of training/validation/test data.")
 tf.flags.DEFINE_string("cache_file_pickle", cache_file_pickle, "path of vocabulary and label files")
 
 tf.flags.DEFINE_integer("label_size", 9, "number of label")
@@ -38,14 +41,14 @@ tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
 tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
 tf.flags.DEFINE_integer("decay_steps", 20000, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.8, "Rate of decay for learning rate")  # 一次衰减多少
-tf.flags.DEFINE_integer("num_sampled", 10, "number of noise sampling")
+tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.8, "to control the activation level of neurons")
 tf.flags.DEFINE_string("ckpt_dir", model_checkpoint, "checkpoint location for the model")
 tf.flags.DEFINE_integer("sentence_len", 200, "max sentence length")
 tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
 tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
 tf.flags.DEFINE_integer("num_epochs", 15, "epoch times")
-tf.flags.DEFINE_integer("validate_every", 10, "validate every validate_every epochs")  # 每10轮做一次验证
+tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每10轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
 
 
@@ -64,7 +67,7 @@ def next_batch(x, y, batch_size):
     for i in range(numBatches):
         start = i * batch_size
         end = start + batch_size
-        batchX = np.array(x[start: end], dtype="float32")
+        batchX = np.array(x[start: end], dtype="int32")
         batchY = np.array(y[start: end], dtype="int32")
 
         yield batchX, batchY
@@ -95,7 +98,7 @@ def do_eval(sess, fast_text, evalX, evalY, batch_size, summary_op, eval_summary_
     for start, end in zip(range(0, number_examples, batch_size), range(batch_size, number_examples, batch_size)):
         curr_eval_loss, curr_eval_acc, step, summary = sess.run(
             [fast_text.loss_val, fast_text.accuracy, fast_text.global_step, summary_op],
-            feed_dict={fast_text.sentence: evalX[start:end], fast_text.labels: evalY[start: end]})
+            feed_dict={fast_text.sentence: evalX[start:end], fast_text.label: evalY[start: end]})
         eval_loss, eval_acc, eval_counter = eval_loss+curr_eval_loss, eval_acc+curr_eval_acc, eval_counter+1
 
         eval_summary_writer.add_summary(summary, step)
@@ -113,7 +116,7 @@ def main(_):
         step6 ->（预测）"""
     # step1 -> load data
     ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
-    train, test, _ = ds.load_data(use_embedding=False, valid_portion=0.2)
+    train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
     vocab_embedding = ds.embedding
     vocab_size = len(ds.word2index)
     print("fasttext_model.vocab_size:", vocab_size)
@@ -160,18 +163,11 @@ def main(_):
                              FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
                              FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
 
-        grads_vars = fast_text.loss_val
-
-        # 用summary绘制tensorBoard
-        gradSummaries = []
-        for g, v in grads_vars:
-            if g is not None:
-                tf.summary.histogram("{}/grad/hist".format(v.name), g)
-                tf.summary.scalar("{}/grad/sparsity".format(v.name), tf.nn.zero_fraction(g))
-
         print("writing to {}\n".format(output_dir))
 
-        loss_summary = tf.summary.scalar("loss", fast_text.loss_val)
+        # 用summary绘制tensorBoard
+        tf.summary.scalar("loss", fast_text.loss_val)
+        tf.summary.scalar('acc', fast_text.accuracy)
         summary_op = tf.summary.merge_all()
 
         train_summary_dir = os.path.join(output_dir, "train")
@@ -188,6 +184,8 @@ def main(_):
             print("Restoring variables from checkpoint")
             saver.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpt_dir))
         else:
+            os.makedirs(model_checkpoint)
+            print("created model checkpoint dir: {}".format(FLAGS.ckpt_dir))
             print('Initializing Variables')
             sess.run(tf.global_variables_initializer())
             if FLAGS.use_embedding:  # load pre-trained word vectors
@@ -212,19 +210,19 @@ def main(_):
                 train_summary_writer.add_summary(summary, step)
 
                 loss, acc, counter = loss+curr_loss, acc+curr_acc, counter+1
-                if counter % 500 == 0:
+                if counter % 100 == 0:
                     print("epoch %d\tbatch %d\ttrain loss:%.3f\ttrain accuracy:%.3f" % (epoch, counter, loss/float(counter), acc/float(counter)))
 
-                if start % (1000 * FLAGS.batch_size) == 0:
-                    eval_loss, eval_accuracy = do_eval(sess, fast_text, testX, testY, batch_size, summary_op, eval_summary_writer)  # testY1999,eval_acc
-                    print("epoch %d validation loss:%.3f\tvalidation accuracy: %.3f" % (
-                    epoch, eval_loss, eval_accuracy))  # ,\tValidation Accuracy: %.3f--->eval_acc
-                    # save model to checkpoint
-                    if start % (6000 * FLAGS.batch_size) == 0:
-                        print("going to save checkpoint.")
-                        save_path = FLAGS.ckpt_dir + "model.ckpt"
-                        path = saver.save(sess, save_path, global_step=fast_text.epoch_step)  # fast_text.epoch_step
-                        print("saved model checkpoint to {}\n".format(path))
+                # if fast_text.global_step % 100 == 0:
+                #     eval_loss, eval_accuracy = do_eval(sess, fast_text, testX, testY, batch_size, summary_op, eval_summary_writer)
+                #     print("epoch %d validation loss:%.3f \t validation accuracy: %.3f" % (
+                #     epoch, eval_loss, eval_accuracy))  # ,\tValidation Accuracy: %.3f--->eval_acc
+                #     # save model to checkpoint
+                #     if start % (450 * FLAGS.batch_size) == 0:
+                #         print("going to save checkpoint.")
+                #         save_path = os.path.join(FLAGS.ckpt_dir, "model.ckpt")
+                #         path = saver.save(sess, save_path, global_step=epoch)  # fast_text.epoch_step
+                #         print("saved model checkpoint to {}\n".format(path))
 
             # epoch increment
             print("going to increment epoch counter....")
@@ -233,11 +231,11 @@ def main(_):
             # 4.validation
             print(epoch, FLAGS.validate_every, (epoch % FLAGS.validate_every == 0))
             if epoch % FLAGS.validate_every == 0:
-                eval_loss, eval_acc = do_eval(sess, fast_text, testX, testY, batch_size)
-                print("epoch %d validation loss:%.3f\tvalidation accuracy: %.3f" % (epoch, eval_loss, eval_acc))
+                eval_loss, eval_acc = do_eval(sess, fast_text, testX, testY, batch_size, summary_op, eval_summary_writer)
+                print("epoch %d validation loss:%.3f \t validation accuracy: %.3f" % (epoch, eval_loss, eval_acc))
                 # save model to checkpoint
-                save_path = FLAGS.ckpt_dir + "model.ckpt"
-                path = saver.save(sess, save_path, global_step=fast_text.epoch_step)
+                save_path = os.path.join(FLAGS.ckpt_dir, "model.ckpt")
+                path = saver.save(sess, save_path, global_step=epoch)
                 print("saved model checkpoint to {}\n".format(path))
 
         # 5.最后在测试集上做测试，并报告测试准确率 Test
