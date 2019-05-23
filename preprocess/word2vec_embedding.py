@@ -129,8 +129,8 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
 
 
 def main():
-    # corpus_data_path = "/data/in_hi_news/raw_data/raw_data"
-    corpus_data_path = "/data/zoushuai/hi_news/raw_data"
+    corpus_data_path = "/data/emotion_analysis/en_news_embed_text"
+    # corpus_data_path = "/data/zoushuai/hi_news/raw_data"
     file = os.path.join(corpus_data_path, "word_embed.txt")
     if not os.path.exists(file):
         write_embed_file(corpus_data_path)

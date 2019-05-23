@@ -17,10 +17,23 @@ from tf_model.fasttext_model import fastText
 from tflearn.data_utils import pad_sequences
 import os
 import codecs
-from preprocess.preprocess_data import create_label_vocabulary, create_vocabulary, load_final_test_data, load_data_predict
+from preprocess.preprocess_data_hi import DataSet
+
+
+current_work_dir = os.path.realpath(__file__)
+root_dir = os.path.dirname(os.path.dirname(current_work_dir))
+data_dir = os.path.join(root_dir, "data", "hi_news")
+training_data_file = os.path.join(data_dir, "top_category_corpus")
+word2vec_file = os.path.join(data_dir, "word2vec.bin")
+model_checkpoint = os.path.join(data_dir, "fasttext_checkpoint")
+model_saved = os.path.join(data_dir, "fasttext_model_saved")
+cache_file_h5py = os.path.join(data_dir, "data.h5")
+cache_file_pickle = os.path.join(data_dir, "vocab_label.pik")
+output_dir = os.path.join(data_dir, "summarys")
+
 
 FLAGS=tf.flags.FLAGS
-tf.flags.DEFINE_integer("label_size", 15, "number of label")
+tf.flags.DEFINE_integer("label_size", 9, "number of label")
 tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
 tf.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 tf.flags.DEFINE_integer("decay_steps", 5000, "how many steps before decay learning rate.")  # 批处理的大小 32-->128
@@ -38,10 +51,10 @@ tf.flags.DEFINE_string("predict_source_file", 'data/news_classification/fasttext
 
 def main(_):
     """导入数据 -> 创建session -> 喂数据 -> 训练 -> (验证) ->（预测）"""
-    vocabulary_word2idx, vocabulary_idx2word = create_vocabulary()  # todo
-    vocab_size = len(vocabulary_word2idx)
-    label2idx, idx2label = create_label_vocabulary
-    questionid_question_lists = load_final_test_data(FLAGS.predict_source_file)
+    ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
+
+    vocab_size = len(ds.word2index)
+    print("fasttext_model.vocab_size:", vocab_size)
     test = load_data_predict(vocabulary_word2idx, label2idx, questionid_question_lists)
     testX = []
     question_id_list = []
@@ -60,8 +73,10 @@ def main(_):
     # config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
         # 4.Instantiate Model
-        fast_text = fastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.batch_size, FLAGS.decay_steps, FLAGS.decay_rate,
-                             FLAGS.num_sampled, FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
+        fast_text = fastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+                             FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
+                             FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
+
         saver = tf.train.Saver()
         if os.path.exists(FLAGS.ckpt_dir + "checkpoint"):
             print("Restoring Variables from Checkpoint")

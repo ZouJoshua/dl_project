@@ -54,7 +54,7 @@ tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not"
 
 def next_batch(x, y, batch_size):
     """
-    生成batch数据集，用生成器的方式输出
+    生成batch数据集(随机打散)，用生成器的方式输出
     """
 
     perm = np.arange(len(x))
@@ -62,15 +62,30 @@ def next_batch(x, y, batch_size):
     x = x[perm]
     y = y[perm]
 
-    numBatches = len(x) // batch_size
+    num_batches = len(x) // batch_size
 
-    for i in range(numBatches):
+    for i in range(num_batches):
         start = i * batch_size
         end = start + batch_size
-        batchX = np.array(x[start: end], dtype="int32")
-        batchY = np.array(y[start: end], dtype="int32")
+        batchX = x[start: end]
+        batchY = y[start: end]
 
         yield batchX, batchY
+
+
+def batch_train(sess, fast_text, batchX, batchY, summary_op, train_summary_writer):
+    """
+    训练函数
+    """
+    curr_loss, curr_acc, step, summary, train_op = sess.run(
+        [fast_text.loss_val, fast_text.accuracy, fast_text.global_step, summary_op, fast_text.train_op],
+        feed_dict={fast_text.sentence: batchX, fast_text.label: batchY})
+    train_summary_writer.add_summary(summary, step)
+
+    loss, acc, counter = loss + curr_loss, acc + curr_acc, counter + 1
+    if counter % 100 == 0:
+        print("epoch %d\tbatch %d\ttrain loss:%.3f\ttrain accuracy:%.3f" % (
+        epoch, counter, loss / float(counter), acc / float(counter)))
 
 
 # 定义性能指标函数
@@ -92,9 +107,10 @@ def gen_metrics(trueY, predY, binaryPredY):
 
 
 # 在验证集上做验证，报告损失、精确度
-def do_eval(sess, fast_text, evalX, evalY, batch_size, summary_op, eval_summary_writer):
+def do_eval(sess, fast_text, evalX, evalY, summary_op, eval_summary_writer):
     number_examples = len(evalX)
     eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
+    batch_size = 1
     for start, end in zip(range(0, number_examples, batch_size), range(batch_size, number_examples, batch_size)):
         curr_eval_loss, curr_eval_acc, step, summary = sess.run(
             [fast_text.loss_val, fast_text.accuracy, fast_text.global_step, summary_op],
@@ -104,6 +120,20 @@ def do_eval(sess, fast_text, evalX, evalY, batch_size, summary_op, eval_summary_
         eval_summary_writer.add_summary(summary, step)
     return eval_loss/float(eval_counter), eval_acc/float(eval_counter)
 
+
+
+
+# 预测的准确率
+def calculate_accuracy(labels_predicted, labels,eval_counter):
+    if eval_counter < 10:
+        print("labels_predicted:", labels_predicted, " ;labels:", labels)
+    count = 0
+    label_dict = {x: x for x in labels}
+    for label_predict in labels_predicted:
+        flag = label_dict.get(label_predict, None)
+    if flag is not None:
+        count = count + 1
+    return count / len(labels)
 
 
 
@@ -231,7 +261,7 @@ def main(_):
             # 4.validation
             print(epoch, FLAGS.validate_every, (epoch % FLAGS.validate_every == 0))
             if epoch % FLAGS.validate_every == 0:
-                eval_loss, eval_acc = do_eval(sess, fast_text, testX, testY, batch_size, summary_op, eval_summary_writer)
+                eval_loss, eval_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer)
                 print("epoch %d validation loss:%.3f \t validation accuracy: %.3f" % (epoch, eval_loss, eval_acc))
                 # save model to checkpoint
                 save_path = os.path.join(FLAGS.ckpt_dir, "model.ckpt")
@@ -239,7 +269,7 @@ def main(_):
                 print("saved model checkpoint to {}\n".format(path))
 
         # 5.最后在测试集上做测试，并报告测试准确率 Test
-        test_loss, test_acc = do_eval(sess, fast_text, testX, testY, batch_size, summary_op, eval_summary_writer)
+        test_loss, test_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer)
         print("test loss: %2.4f, test accruacy: %2.4f" % (test_loss, test_acc))
     pass
 

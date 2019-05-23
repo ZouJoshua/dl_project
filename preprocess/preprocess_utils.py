@@ -27,7 +27,7 @@ def read_json_format_file(file):
             if not _line:
                 break
             else:
-                line = json.loads(_line)
+                line = json.loads(_line.strip())
                 yield line
 
 def read_txt_file(file):
@@ -78,4 +78,4 @@ def sort_by_value(d):
     items = d.items()
     backitems=[[v[1],v[0]] for v in items]
     backitems.sort(reverse=True)
-    return [ backitems[i][1] for i in range(0,len(backitems))]
+    return [backitems[i][1] for i in range(0, len(backitems))]

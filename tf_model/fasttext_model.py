@@ -98,11 +98,18 @@ class fastText(object):
         return loss
 
     def l2_loss(self, l2_lambda=0.001):
+        """
+        根据每次训练的预测结果和标准结果比较，计算误差
+                loss = loss + l2_lambda*1/2*||variables||2
+        :param l2_lambda: 超参数，l2正则，保证l2_loss和train_loss在同一量级
+        :return: 每次训练的损失值loss
+        """
         labels_one_hot = tf.one_hot(self.label, self.label_size)
-        loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(
-            labels=labels_one_hot, logits=self.logits), axis=1)
-        # losses = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits))
-        # losses = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label, logits=self.logits))
+        losses = tf.nn.softmax_cross_entropy_with_logits(
+            labels=labels_one_hot, logits=self.logits)
+        # losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits)
+        # losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label, logits=self.logits)
+        loss = tf.reduce_mean(losses)
         l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
         loss = loss + l2_losses
         return loss
