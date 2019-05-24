@@ -130,6 +130,7 @@ def train(config, wordEmbedding, data):
                 _, summary, step, loss, predictions, binaryPreds = sess.run(
                     [trainOp, summaryOp, globalStep, cnn.loss, cnn.predictions, cnn.binaryPreds],
                     feed_dict)
+
                 timeStr = datetime.datetime.now().isoformat()
                 acc, auc, precision, recall = genMetrics(batchY, predictions, binaryPreds)
                 print("{}, step: {}, loss: {}, acc: {}, auc: {}, precision: {}, recall: {}".format(timeStr, step, loss, acc,
@@ -149,7 +150,10 @@ def train(config, wordEmbedding, data):
                 summary, step, loss, predictions, binaryPreds = sess.run(
                     [summaryOp, globalStep, cnn.loss, cnn.predictions, cnn.binaryPreds],
                     feed_dict)
-
+                print("******************")
+                print(predictions)
+                print("******************")
+                print(binaryPreds)
                 acc, auc, precision, recall = genMetrics(batchY, predictions, binaryPreds)
 
                 evalSummaryWriter.add_summary(summary, step)

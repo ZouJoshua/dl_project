@@ -105,6 +105,7 @@ class fastText(object):
         :return: 每次训练的损失值loss
         """
         labels_one_hot = tf.one_hot(self.label, self.label_size)
+        self.y_true = labels_one_hot.eval()
         losses = tf.nn.softmax_cross_entropy_with_logits(
             labels=labels_one_hot, logits=self.logits)
         # losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits)
@@ -114,10 +115,10 @@ class fastText(object):
         loss = loss + l2_losses
         return loss
 
-
     def acc(self):
         with tf.name_scope('accuracy'):
             self.predictions = tf.argmax(self.logits, axis=1, name="predictions")
+            self.y_pred = self.predictions.eval()
             correct_predictions = tf.equal(tf.cast(self.predictions, tf.int32), self.label)
             accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32), name="accuracy")
         return accuracy
