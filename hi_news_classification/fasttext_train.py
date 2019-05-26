@@ -11,14 +11,19 @@
 import tensorflow as tf
 import numpy as np
 import os
+import sys
+
+current_work_dir = os.path.realpath(__file__)
+root_dir = os.path.dirname(os.path.dirname(current_work_dir))
+sys.path.append(root_dir)
+
 from tf_model.fasttext_model import fastText
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
 from gensim.models import KeyedVectors
 from preprocess.preprocess_data_hi import DataSet
 
-current_work_dir = os.path.realpath(__file__)
-root_dir = os.path.dirname(os.path.dirname(current_work_dir))
+
 data_dir = os.path.join(root_dir, "data", "hi_news")
 training_data_file = os.path.join(data_dir, "top_category_corpus")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
