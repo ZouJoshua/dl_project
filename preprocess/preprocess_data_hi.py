@@ -323,21 +323,22 @@ class TopcategoryCorpus(object):
 def main():
     # 处理语料
     # data_base_dir = r'/data/in_hi_news/train_data'
-    # file1 = os.path.join(data_base_dir, 'topcategory_all')
-    # file2 = os.path.join(data_base_dir, 'auto_science_tech')
-    # out_file = os.path.join(data_base_dir, 'top_category_corpus')
-    # TopcategoryCorpus(file1, file2, out_file)
+    data_base_dir = r"/home/joshua/tensorflowProject/tensorflow_project/data/hi_news"
+    file1 = os.path.join(data_base_dir, 'topcategory_all')
+    file2 = os.path.join(data_base_dir, 'auto_science_tech')
+    out_file = os.path.join(data_base_dir, 'top_category_corpus')
+    TopcategoryCorpus(file1, file2, out_file)
 
     # 加载数据
-    data_dir = "/home/zoushuai/algoproject/tf_project/data/hi_news"
-    training_data_file = os.path.join(data_dir, "top_category_corpus")
-    word2vec_file = os.path.join(data_dir, "word2vec.bin")
-    ds = DataSet(data_dir, word2vec_file, training_data_file)
-    train, test, _ = ds.load_data(use_embedding=False, valid_portion=0.2)
-    trainx, trainy = train
-    testx, testy = test
-    print(trainx[:1])
-    print(trainy[:1])
+    # data_dir = "/home/zoushuai/algoproject/tf_project/data/hi_news"
+    # training_data_file = os.path.join(data_dir, "top_category_corpus")
+    # word2vec_file = os.path.join(data_dir, "word2vec.bin")
+    # ds = DataSet(data_dir, word2vec_file, training_data_file)
+    # train, test, _ = ds.load_data(use_embedding=False, valid_portion=0.2)
+    # trainx, trainy = train
+    # testx, testy = test
+    # print(trainx[:1])
+    # print(trainy[:1])
 
 if __name__ == "__main__":
     main()

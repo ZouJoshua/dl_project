@@ -23,7 +23,7 @@ data_dir = os.path.join(root_dir, "data", "hi_news")
 training_data_file = os.path.join(data_dir, "top_category_corpus")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
 model_checkpoint = os.path.join(data_dir, "fasttext_checkpoint")
-model_saved = os.path.join(data_dir, "fasttext_model_saved")
+model_saved = os.path.join(data_dir, "pb_model")
 cache_file_h5py = os.path.join(data_dir, "data.h5")
 cache_file_pickle = os.path.join(data_dir, "vocab_label.pik")
 output_dir = os.path.join(data_dir, "summarys")
@@ -82,8 +82,6 @@ def batch_train(sess, fast_text, batch_x, batch_y, summary_op, train_summary_wri
         feed_dict={fast_text.sentence: batch_x, fast_text.label: batch_y})
     train_summary_writer.add_summary(summary, step)
     return curr_loss, curr_acc
-
-
 
 
 
@@ -194,31 +192,28 @@ def tf_confusion_metrics(predict, real, session):
 
 
 #保存为pb模型
-def export_model(session, m, builder):
-
+def export_model(session, fast_text, export_path):
 
    #只需要修改这一段，定义输入输出，其他保持默认即可
-    model_signature = builder.signature_def_utils.build_signature_def(
-        inputs={"input": utils.build_tensor_info(m.a)},
-        outputs={"output": utils.build_tensor_info(m.y)},
-        method_name=builder.signature_constants.PREDICT_METHOD_NAME)
+    prediction_signature = tf.saved_model.signature_def_utils.build_signature_def(
+        inputs={"input": tf.saved_model.utils.build_tensor_info(fast_text.sentence)},
+        outputs={"output": tf.saved_model.utils.build_tensor_info(fast_text.label)},
+        method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
 
-    export_path = "pb_model/1"
     if os.path.exists(export_path):
-        os.system("rm -rf "+ export_path)
+        os.system("rm -rf " + export_path)
     print("Export the model to {}".format(export_path))
 
     try:
         legacy_init_op = tf.group(
             tf.tables_initializer(), name='legacy_init_op')
-        builder = saved_model_builder.SavedModelBuilder(export_path)
+        builder = tf.saved_model.builder.SavedModelBuilder(export_path)
         builder.add_meta_graph_and_variables(
-            session, [tag_constants.SERVING],
+            session, [tf.saved_model.tag_constants.SERVING],
             clear_devices=True,
             signature_def_map={
-                signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
-                    model_signature,
-            },
+                tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                    prediction_signature},
             legacy_init_op=legacy_init_op)
 
         builder.save()
@@ -275,7 +270,7 @@ def main(_):
 
     # step2 -> create session
     config = tf.ConfigProto()
-    # config.gpu_options.allow_growth = True
+    config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
         # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         # run_metadata = tf.RunMetadata
@@ -299,8 +294,7 @@ def main(_):
 
         # Initialize Save
         saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
-        # 保存模型的一种方式，保存为pb文件
-        builder = tf.saved_model.builder.SavedModelBuilder(model_saved)
+
 
         if os.path.exists(FLAGS.ckpt_dir):
             print("Restoring variables from checkpoint")
@@ -338,11 +332,10 @@ def main(_):
                 if counter % 20 == 0:
                     print("epoch %d\tbatch %d\ttrain loss:%.3f\ttrain accuracy:%.3f" % (epoch, counter, loss / float(counter),
                                                                                         acc / float(counter)))
-                if counter % 122 == 0:
-                    eval_loss, eval_accuracy = do_eval(sess, fast_text, testX, testY, index2label)
-                    print(eval_loss, eval_accuracy)
+                # if counter % 122 == 0:
+                #     eval_loss, eval_accuracy = do_eval(sess, fast_text, testX, testY, index2label)
+                #     print(eval_loss, eval_accuracy)
             # 验证模型
-
 
             # epoch increment
             print("going to increment epoch counter....")
@@ -362,11 +355,8 @@ def main(_):
         test_loss, test_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer, index2label)
         print("test loss: %2.4f, test accruacy: %2.4f" % (test_loss, test_acc))
 
-        builder.add_meta_graph_and_variables(sess, [tf.saved_model.tag_constants.SERVING],
-                                             signature_def_map={"predict": prediction_signature},
-                                             legacy_init_op=legacy_init_op)
-
-        builder.save()
+        # 保存模型的一种方式，保存为pb文件
+        export_model(sess, fast_text, model_saved)
 
 
 
