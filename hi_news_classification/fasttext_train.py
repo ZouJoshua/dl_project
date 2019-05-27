@@ -17,7 +17,11 @@ current_work_dir = os.path.realpath(__file__)
 root_dir = os.path.dirname(os.path.dirname(current_work_dir))
 sys.path.append(root_dir)
 
-from tf_model.fasttext_model import fastText
+
+import warnings
+warnings.filterwarnings('ignore')
+
+from tf_model.fasttext_model import FastText
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
 from gensim.models import KeyedVectors
@@ -42,9 +46,9 @@ tf.flags.DEFINE_string("cache_file_h5py", cache_file_h5py, "path of training/val
 tf.flags.DEFINE_string("cache_file_pickle", cache_file_pickle, "path of vocabulary and label files")
 
 tf.flags.DEFINE_integer("label_size", 9, "number of label")
-tf.flags.DEFINE_float("learning_rate", 0.1, "learning rate")
-tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
-tf.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate")
+tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
+tf.flags.DEFINE_integer("batch_size", 256, "batch size for training/evaluating")  # 批处理的大小 32-->128
+tf.flags.DEFINE_integer("decay_steps", 100, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 一次衰减多少
 tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.8, "to control the activation level of neurons")
@@ -119,6 +123,8 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
             feed_dict={fast_text.sentence: batch_eval[0], fast_text.label: batch_eval[1]})
         eval_summary_writer.add_summary(summary, step)
 
+        labels_one_hot = tf.one_hot(real_labels, 9).eval()
+        pred_labels_one_hot = tf.one_hot(pred_labels, 9).eval()
         acc, auc, prec, recall, f1 = gen_metrics(real_labels, pred_labels, logits)
 
         eval_loss, eval_counter, eval_acc = eval_loss + curr_eval_loss, eval_counter + 1, eval_acc + acc
@@ -275,13 +281,13 @@ def main(_):
 
     # step2 -> create session
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+    # config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
         # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         # run_metadata = tf.RunMetadata
 
         # Instantiate Model
-        fast_text = fastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+        fast_text = FastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
                              FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
                              FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
 
@@ -302,12 +308,12 @@ def main(_):
 
 
         if os.path.exists(FLAGS.ckpt_dir):
-            print("Restoring variables from checkpoint")
+            print("restoring variables from checkpoint")
             saver.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpt_dir))
         else:
             os.makedirs(model_checkpoint)
             print("created model checkpoint dir: {}".format(FLAGS.ckpt_dir))
-            print('Initializing Variables')
+            print('initializing variables...')
             sess.run(tf.global_variables_initializer())
             if FLAGS.use_embedding:  # load pre-trained word vectors
                 word_embedding = tf.constant(vocab_embedding, dtype=tf.float32)  # convert to tensor

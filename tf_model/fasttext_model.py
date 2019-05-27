@@ -11,7 +11,7 @@
 import tensorflow as tf
 
 
-class fastText(object):
+class FastText(object):
     
     def __init__(self,
                  label_size,
@@ -104,10 +104,10 @@ class fastText(object):
         :param l2_lambda: 超参数，l2正则，保证l2_loss和train_loss在同一量级
         :return: 每次训练的损失值loss
         """
-        labels_one_hot = tf.one_hot(self.label, self.label_size)
-        self.y_true = labels_one_hot.eval()
+        self.y_true = tf.one_hot(self.label, self.label_size)
+        # self.y_true = labels_one_hot.eval()
         losses = tf.nn.softmax_cross_entropy_with_logits(
-            labels=labels_one_hot, logits=self.logits)
+            labels=self.y_true, logits=self.logits)
         # losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits)
         # losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label, logits=self.logits)
         loss = tf.reduce_mean(losses)
@@ -118,7 +118,7 @@ class fastText(object):
     def acc(self):
         with tf.name_scope('accuracy'):
             self.predictions = tf.argmax(self.logits, axis=1, name="predictions")
-            self.y_pred = self.predictions.eval()
+            self.y_pred = tf.one_hot(self.predictions, self.label_size)
             correct_predictions = tf.equal(tf.cast(self.predictions, tf.int32), self.label)
             accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32), name="accuracy")
         return accuracy
