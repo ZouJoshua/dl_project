@@ -24,13 +24,13 @@ from tf_model.textcnn_model import TextCNN
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
 from gensim.models import KeyedVectors
-from preprocess.preprocess_data_hi import DataSet
+from preprocess.preprocess_data_taste import DataSet
 
 
-data_dir = os.path.join(root_dir, "data", "hi_news")
-training_data_file = os.path.join(data_dir, "top_category_corpus")
+data_dir = os.path.join(root_dir, "data", "en_news")
+training_data_file = os.path.join(data_dir, "train_corpus_taste")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
-model_checkpoint = os.path.join(data_dir, "fasttext_checkpoint")
+model_checkpoint = os.path.join(data_dir, "textcnn_checkpoint")
 model_saved = os.path.join(data_dir, "pb_model")
 cache_file_h5py = os.path.join(data_dir, "data.h5")
 cache_file_pickle = os.path.join(data_dir, "vocab_label.pik")
@@ -44,13 +44,13 @@ FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string("cache_file_h5py", cache_file_h5py, "path of training/validation/test data.")
 tf.flags.DEFINE_string("cache_file_pickle", cache_file_pickle, "path of vocabulary and label files")
 
-tf.flags.DEFINE_integer("label_size", 9, "number of label")
-tf.flags.DEFINE_float("learning_rate", 0.05, "learning rate")
-tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
-tf.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate")
+tf.flags.DEFINE_integer("label_size", 4, "number of label")
+tf.flags.DEFINE_float("learning_rate", 0.003, "learning rate")
+tf.flags.DEFINE_integer("batch_size", 256, "batch size for training/evaluating")  # 批处理的大小 32-->128
+tf.flags.DEFINE_integer("decay_steps", 20000, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 一次衰减多少
 tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
-tf.flags.DEFINE_float("dropout_keep_prob", 0.8, "to control the activation level of neurons")
+tf.flags.DEFINE_float("dropout_keep_prob", 1.0, "to control the activation level of neurons")
 tf.flags.DEFINE_string("ckpt_dir", model_checkpoint, "checkpoint location for the model")
 tf.flags.DEFINE_integer("sentence_len", 200, "max sentence length")
 tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
@@ -58,6 +58,9 @@ tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/infer
 tf.flags.DEFINE_integer("num_epochs", 15, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
+tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
+
+filter_sizes = [3, 4, 5]
 
 
 def next_batch(x, y, batch_size):
@@ -81,13 +84,13 @@ def next_batch(x, y, batch_size):
         yield batch_x, batch_y
 
 
-def batch_train(sess, fast_text, batch_x, batch_y, summary_op, train_summary_writer):
+def batch_train(sess, textcnn, batch_x, batch_y, keep_prob, summary_op, train_summary_writer):
     """
     训练函数
     """
     curr_loss, curr_acc, step, summary, train_op = sess.run(
-        [fast_text.loss_val, fast_text.accuracy, fast_text.global_step, summary_op, fast_text.train_op],
-        feed_dict={fast_text.sentence: batch_x, fast_text.label: batch_y})
+        [textcnn.loss_val, textcnn.accuracy, textcnn.global_step, summary_op, textcnn.train_op],
+        feed_dict={textcnn.sentence: batch_x, textcnn.label: batch_y, textcnn.dropout_keep_prob: keep_prob})
     train_summary_writer.add_summary(summary, step)
     return curr_loss, curr_acc
 
@@ -110,7 +113,7 @@ def gen_metrics(y_true, y_pred, logits):
 
 
 # 在验证集上做验证，计算损失、精确度
-def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, index2label):
+def do_eval(sess, textcnn, eval_x, eval_y, summary_op, eval_summary_writer, index2label):
     number_examples = len(eval_x)
     print("number_examples for validation:", number_examples)
     eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
@@ -118,8 +121,8 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
 
     for batch_eval in next_batch(eval_x, eval_y, batch_size):
         curr_eval_loss, logits, step, real_labels, pred_labels, summary = sess.run(
-            [fast_text.loss_val, fast_text.logits, fast_text.epoch_increment, fast_text.y_true, fast_text.y_pred, summary_op],
-            feed_dict={fast_text.sentence: batch_eval[0], fast_text.label: batch_eval[1]})
+            [textcnn.loss_val, textcnn.logits, textcnn.epoch_increment, textcnn.y_true, textcnn.y_pred, summary_op],
+            feed_dict={textcnn.sentence: batch_eval[0], textcnn.label: batch_eval[1], textcnn.dropout_keep_prob: 1.0})
         eval_summary_writer.add_summary(summary, step)
 
         labels_one_hot = tf.one_hot(real_labels, 9).eval()
@@ -133,71 +136,6 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
 
     return eval_loss/float(eval_counter), eval_acc/float(eval_counter)
 
-
-
-
-def tf_confusion_metrics(predict, real, session):
-    predictions = tf.argmax(predict, 1)
-    actuals = tf.argmax(real, 1)
-
-    ones_like_actuals = tf.ones_like(actuals)
-    zeros_like_actuals = tf.zeros_like(actuals)
-    ones_like_predictions = tf.ones_like(predictions)
-    zeros_like_predictions = tf.zeros_like(predictions)
-
-    tp_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, ones_like_actuals),
-                tf.equal(predictions, ones_like_predictions)
-            ),
-            "float"
-        )
-    )
-
-    tn_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, zeros_like_actuals),
-                tf.equal(predictions, zeros_like_predictions)
-            ),
-            "float"
-        )
-    )
-
-    fp_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, zeros_like_actuals),
-                tf.equal(predictions, ones_like_predictions)
-            ),
-            "float"
-        )
-    )
-
-    fn_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, ones_like_actuals),
-                tf.equal(predictions, zeros_like_predictions)
-            ),
-            "float"
-        )
-    )
-    tp, tn, fp, fn = session.run([tp_op, tn_op, fp_op, fn_op])
-
-    tpr = float(tp) / (float(tp) + float(fn))
-    fpr = float(fp) / (float(fp) + float(tn))
-    fnr = float(fn) / (float(tp) + float(fn))
-
-    accuracy = (float(tp) + float(tn)) / (float(tp) + float(fp) + float(fn) + float(tn))
-
-    recall = tpr
-    precision = float(tp) / (float(tp) + float(fp))
-
-    f1_score = (2 * (precision * recall)) / (precision + recall)
-
-    return accuracy, recall, precision, f1_score
 
 
 
@@ -286,15 +224,15 @@ def main(_):
         # run_metadata = tf.RunMetadata
 
         # Instantiate Model
-        fast_text = fastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
-                             FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
-                             FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
+
+        textcnn = TextCNN(filter_sizes, FLAGS.num_filters, FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+                             FLAGS.batch_size, FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
 
         print("writing to {}\n".format(output_dir))
 
         # 用summary绘制tensorBoard
-        tf.summary.scalar("loss", fast_text.loss_val)
-        tf.summary.scalar('acc', fast_text.accuracy)
+        tf.summary.scalar("loss", textcnn.loss_val)
+        tf.summary.scalar('acc', textcnn.accuracy)
         summary_op = tf.summary.merge_all()
 
         train_summary_dir = os.path.join(output_dir, "train")
@@ -316,11 +254,11 @@ def main(_):
             sess.run(tf.global_variables_initializer())
             if FLAGS.use_embedding:  # load pre-trained word vectors
                 word_embedding = tf.constant(vocab_embedding, dtype=tf.float32)  # convert to tensor
-                t_assign_embedding = tf.assign(fast_text.embedding,
+                t_assign_embedding = tf.assign(textcnn.embedding,
                                                word_embedding)
                 sess.run(t_assign_embedding)
 
-        curr_epoch = sess.run(fast_text.epoch_step)
+        curr_epoch = sess.run(textcnn.epoch_step)
 
         # step3 -> feed data and train the model
         number_of_training_data = len(trainX)
@@ -336,7 +274,7 @@ def main(_):
                 # if epoch == 0 and counter == 0:
                 #     print("train_x[start:end]:", batch[0])
                 #     print("train_y[start:end]:", batch[1])
-                batch_loss, batch_acc = batch_train(sess, fast_text, batch[0], batch[1], summary_op, train_summary_writer)
+                batch_loss, batch_acc = batch_train(sess, textcnn, batch[0], batch[1], FLAGS.dropout_keep_prob, summary_op, train_summary_writer)
                 loss, acc, counter = loss + batch_loss, acc + batch_acc, counter + 1
 
                 if counter % 20 == 0:
@@ -349,12 +287,12 @@ def main(_):
 
             # epoch increment
             print("going to increment epoch counter....")
-            sess.run(fast_text.epoch_increment)
+            sess.run(textcnn.epoch_increment)
 
             # step4 -> validation
             print("validation epoch:{} validate_every:{}".format(epoch, FLAGS.validate_every))
             if epoch % FLAGS.validate_every == 0:
-                eval_loss, eval_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer, index2label)
+                eval_loss, eval_acc = do_eval(sess, textcnn, testX, testY, summary_op, eval_summary_writer, index2label)
                 print("epoch %d validation loss:%.3f \t validation accuracy: %.3f" % (epoch, eval_loss, eval_acc))
                 # save model to checkpoint
                 save_path = os.path.join(FLAGS.ckpt_dir, "model.ckpt")
@@ -362,11 +300,11 @@ def main(_):
                 print("saved model checkpoint to {}\n".format(path))
 
         # step5 -> 最后在测试集上测试
-        test_loss, test_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer, index2label)
+        test_loss, test_acc = do_eval(sess, textcnn, testX, testY, summary_op, eval_summary_writer, index2label)
         print("test loss: %2.4f, test accruacy: %2.4f" % (test_loss, test_acc))
 
         # 保存模型的一种方式，保存为pb文件
-        export_model(sess, fast_text, model_saved)
+        export_model(sess, textcnn, model_saved)
 
 
 

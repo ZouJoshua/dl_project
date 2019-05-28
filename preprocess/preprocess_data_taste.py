@@ -11,7 +11,7 @@
 
 
 import os
-import time
+import re
 import pickle
 import json
 import random
@@ -110,7 +110,7 @@ class DataSet(object):
             label_count_dict = dict()  # {label:count} 统计各类别的样本数
             lines = read_json_format_file(self.raw_data_path)
             for line in lines:
-                label = line['taste']
+                label = str(line['taste'])
                 if label_count_dict.get(label, None) is not None:
                     label_count_dict[label] += 1
                 else:
@@ -161,9 +161,10 @@ class DataSet(object):
 
         for i, line in enumerate(lines):
             title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
-            content = line["text"].strip()
+            content = line["text"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
             x = title + " " + content
-            y = line["taste"]
+            x = re.sub("\s+", " ", x)
+            y = str(line["taste"])
             # 打印前几条
             if i < 2:
                 print("x{}:".format(i), x)  # get raw x
@@ -174,6 +175,8 @@ class DataSet(object):
             y = self.label2index[y]
             X.append(x)
             Y.append(y)
+            if i == 10000:
+                break
 
         # 4.split to train,test and valid data(基于y标签分层)
         doc_num = len(X)
@@ -288,7 +291,7 @@ class SplitData(object):
                 if not _line:
                     break
                 else:
-                    line = json.loads(_line)
+                    line = json.loads(_line.strip())
                     yield line
 
     def shuff_data(self):
@@ -330,6 +333,7 @@ if __name__ == '__main__':
     raw_data = os.path.join(data_dir, "raw_data")
     # training_data_file = os.path.join(data_dir, "train_corpus")
     training_data_file = os.path.join(data_dir, "train_corpus_emotion")
+    # training_data_file = os.path.join(data_dir, "train_corpus_taste")
     if not os.path.exists(training_data_file):
         print("xxx")
         SplitData(raw_data, training_data_file)
