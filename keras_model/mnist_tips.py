@@ -12,7 +12,7 @@ from keras.datasets import mnist
 from keras.optimizers import SGD
 from keras.utils import np_utils
 from keras.models import Sequential
-from keras.layers.core import Dense,Dropout,Activation
+from keras.layers.core import Dense, Dropout, Activation
 
 
 # 加载数据
@@ -36,13 +36,13 @@ def load_data():
 
 
 # 选择合适的loss函数
-def test_loss_mse():
+def t_loss_mse():
     model = Sequential()
     model.add(Dense(input_dim=28*28, units=689, activation='sigmoid'))
     model.add(Dense(units=689, activation='sigmoid'))
     model.add(Dense(units=689, activation='sigmoid'))
-    model.add(Dense(units=10, activation='softmax')) # 输出层10个节点
-    model.compile(loss='mse', optimizer=SGD(lr=0.1),metrics=['accuracy'])
+    model.add(Dense(units=10, activation='softmax'))  # 输出层10个节点
+    model.compile(loss='mse', optimizer=SGD(lr=0.1), metrics=['accuracy'])
     model.fit(x_train, y_train, batch_size=100, epochs=20)
 
     train_result = model.evaluate(x_train, y_train, batch_size=10000)
@@ -51,7 +51,7 @@ def test_loss_mse():
     print('Test Accc:', test_result[1])
 
 
-def test_loss_categorical_crossentropy():
+def t_loss_categorical_crossentropy():
     model = Sequential()
     model.add(Dense(input_dim=28 * 28, units=689, activation='sigmoid'))
     model.add(Dense(units=689, activation='sigmoid'))
@@ -68,7 +68,7 @@ def test_loss_categorical_crossentropy():
 
 # 合适的隐藏层数量
 
-def test_num_hid():
+def t_num_hid():
     model = Sequential()
     model.add(Dense(input_dim=28 * 28, units=689, activation='sigmoid'))  # sigmoid会导致vanish gradient problem(梯度消失)
     for _ in range(10):
@@ -85,7 +85,7 @@ def test_num_hid():
 
 # 合适的激活函数
 
-def test_activation_relu():
+def t_activation_relu():
     model = Sequential()
     model.add(Dense(input_dim=28 * 28, units=689, activation='relu'))
     for _ in range(10):
@@ -101,7 +101,7 @@ def test_activation_relu():
 
 
 # 合适的batch_size( batch_size 过大速度快,但会影响精度.而过小则速度会慢)
-def test_batch_size():
+def t_batch_size():
     model = Sequential()
     model.add(Dense(input_dim=28 * 28, units=689, activation='relu'))
     for _ in range(10):
@@ -117,7 +117,7 @@ def test_batch_size():
 
 
 # 合适的optimizer
-def test_optimizer_adam():
+def t_optimizer_adam():
     model = Sequential()
     model.add(Dense(input_dim=28 * 28, units=689, activation='relu'))
     for _ in range(10):
@@ -151,7 +151,7 @@ def load_data_normal():
 
 
 
-def test_dropout():
+def t_dropout():
     """2层relu+adam+categorical_crossentropy+batch_size=100"""
     (x_train, y_train), (x_test, y_test) = load_data_normal()
     model = Sequential()
@@ -169,3 +169,6 @@ def test_dropout():
     test_result = model.evaluate(x_test, y_test, batch_size=10000)
     print('Train Accc:', train_result[1])
     print('Test Accc:', test_result[1])
+
+if __name__ == "__main__":
+    t_loss_mse()
