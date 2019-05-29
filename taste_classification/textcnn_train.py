@@ -125,8 +125,6 @@ def do_eval(sess, textcnn, eval_x, eval_y, summary_op, eval_summary_writer, inde
             feed_dict={textcnn.sentence: batch_eval[0], textcnn.label: batch_eval[1], textcnn.dropout_keep_prob: 1.0})
         eval_summary_writer.add_summary(summary, step)
 
-        labels_one_hot = tf.one_hot(real_labels, 9).eval()
-        pred_labels_one_hot = tf.one_hot(pred_labels, 9).eval()
         acc, auc, prec, recall, f1 = gen_metrics(real_labels, pred_labels, logits)
 
         eval_loss, eval_counter, eval_acc = eval_loss + curr_eval_loss, eval_counter + 1, eval_acc + acc
