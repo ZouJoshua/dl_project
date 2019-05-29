@@ -64,7 +64,7 @@ class TextCNN(object):
     def init_weights(self):
         """define all weights here"""
         with tf.name_scope("embedding"):
-            self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size])  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
+            self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
             self.w = tf.get_variable("w", shape=[self.num_filters_total, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
             self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
 
@@ -94,7 +94,7 @@ class TextCNN(object):
         # loop each filter size
         # for each filter, do: convolution-pooling layer, feature shape is 4-d. Feature is a new variable
         # step1.create filters
-        # step2.conv
+        # step2.conv (CNN->BN->relu)
         # step3.apply nolinearity(tf.nn.relu)
         # step4.max-pooling(tf.nn.max_pool)
         # step5.dropout
@@ -139,7 +139,7 @@ class TextCNN(object):
         # loop each filter size
         # for each filter, do: convolution-pooling layer, feature shape is 4-d. Feature is a new variable
         # step1.create filters
-        # step2.conv
+        # step2.conv (CNN->BN->relu)
         # step3.apply nolinearity(tf.nn.relu)
         # step4.max-pooling(tf.nn.max_pool)
         # step5.dropout
