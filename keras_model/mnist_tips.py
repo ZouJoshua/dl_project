@@ -22,11 +22,11 @@ def load_data():
     number = 10000
     x_train = x_train[:number] # 完整训练数据有6w,这里取前1w
     y_train = y_train[:number]
-    x_train = x_train.reshape(number,28*28) # 原始数据是3维,这里变成2维
-    x_test=x_test.reshape(x_test.shape[0],28*28)
+    x_train = x_train.reshape(number, 28*28)  # 原始数据是3维,这里变成2维
+    x_test=x_test.reshape(x_test.shape[0], 28*28)
     x_train = x_train.astype('float32')
     x_test = x_test.astype('float32')
-    y_train = np_utils.to_categorical(y_train, 10) # 原始数据是1,2...9这样的数字,to_categorical将其变成向量,对应的数字位置为1,其余为0
+    y_train = np_utils.to_categorical(y_train, 10)  # 原始数据是1,2...9这样的数字,to_categorical将其变成向量,对应的数字位置为1,其余为0
     y_test = np_utils.to_categorical(y_test, 10)
     x_train = x_train / 255
     x_test = x_test / 255

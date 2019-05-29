@@ -37,6 +37,7 @@ class FastText(object):
         self.num_sampled = num_sampled
         self.sentence_len = sentence_len
         self.is_training = is_training
+        self.initializer = tf.random_normal_initializer(stddev=0.1)
 
         self.sentence = tf.placeholder(tf.int32, [None, self.sentence_len], name="sentence")   # X
         self.label = tf.placeholder(tf.int32, [None], name="label")  # Y
@@ -53,8 +54,8 @@ class FastText(object):
 
     def init_weights(self):
         with tf.name_scope("embedding"):
-            self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dims])
-        self.w = tf.get_variable("w", [self.embedding_dims, self.label_size])
+            self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dims], initializer=self.initializer)
+        self.w = tf.get_variable("w", [self.embedding_dims, self.label_size], initializer=self.initializer)
         self.b = tf.get_variable("b", [self.label_size])
 
     def inference(self):
@@ -97,7 +98,7 @@ class FastText(object):
         loss = loss + l2_losses
         return loss
 
-    def l2_loss(self, l2_lambda=0.001):
+    def l2_loss(self, l2_lambda=0.0001):
         """
         根据每次训练的预测结果和标准结果比较，计算误差
                 loss = loss + l2_lambda*1/2*||variables||2
