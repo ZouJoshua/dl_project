@@ -116,7 +116,7 @@ class TextCNN(object):
 
                 # step3.apply nolinearity
                 # h是最终卷积层的输出，即每个feature map，shape = [batch_size, sentence_len - filter_size + 1, 1, num_filters]
-                b = tf.get_variable("b-%s" % filter_size, [self.num_filters])  # ADD 2017-06-09
+                b = tf.get_variable("b-%s" % filter_size, [self.num_filters])
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), "relu")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
                 # step4.max-pooling.
                 # value: A 4-D `Tensor` with shape `[batch, height, width, channels]
