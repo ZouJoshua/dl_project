@@ -15,6 +15,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import sys
+import codecs
 
 current_work_dir = os.path.realpath(__file__)
 root_dir = os.path.dirname(os.path.dirname(current_work_dir))
@@ -32,7 +33,8 @@ from preprocess.preprocess_data_hi import DataSet
 
 
 data_dir = os.path.join(root_dir, "data", "hi_news")
-training_data_file = os.path.join(data_dir, "top_category_corpus")
+predict_data_file = os.path.join(data_dir, "corpus_predict")
+predict_result_file = os.path.join(data_dir, "corpus_predict_result")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
 model_checkpoint = os.path.join(data_dir, "fasttext_checkpoint")
 model_saved = os.path.join(data_dir, "pb_model")
@@ -62,36 +64,28 @@ tf.flags.DEFINE_boolean("is_training", False, "true:training, false:testing/infe
 tf.flags.DEFINE_integer("num_epochs", 20, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
+tf.flags.DEFINE_string("predict_source_file", predict_result_file, "target file path for final prediction")
+tf.flags.DEFINE_string("predict_target_file", predict_data_file, "target file path for final prediction")
 
 
 def main(_):
     """导入数据 -> 创建session -> 喂数据 -> 训练 -> (验证) ->（预测）"""
 
     # step1 -> load data
-    ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
-    train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
-    index2label = ds.index2label
-    vocab_embedding = ds.embedding
+    ds = DataSet(data_dir, word2vec_file, embedding_dims=FLAGS.embed_size)
+    data = ds.load_data_predict(FLAGS.predict_source_file)
+    predict_data = list()
+    id_list = list()
     vocab_size = len(ds.word2index)
     print("fasttext_model.vocab_size:", vocab_size)
-    # num_classes = len(ds.label2index)
-    # print("num_classes:", num_classes)
-    print("num_classes:", FLAGS.label_size)
-    trainX, trainY = train
-    testX, testY = test
-
-
-    test = load_data_predict(vocabulary_word2idx, label2idx, questionid_question_lists)
-    testX = []
-    question_id_list = []
-    for tuple in test:
-        question_id, question_string_list = tuple
-        question_id_list.append(question_id)
-        testX.append(question_string_list)
+    for doc in data:
+        doc_id, pred_data = doc
+        id_list.append(doc_id)
+        predict_data.append(pred_data)
 
     # 2.Data preprocessing: Sequence padding
     print("start padding....")
-    testX2 = pad_sequences(testX, maxlen=FLAGS.sentence_len, value=0.)  # padding to max length
+    testX2 = pad_sequences(predict_data, maxlen=FLAGS.sentence_len, value=0.)  # padding to max length
     print("end padding...")
 
     # 3.create session.
@@ -99,7 +93,7 @@ def main(_):
     # config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
         # 4.Instantiate Model
-        fast_text = fastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+        fast_text = FastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
                              FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
                              FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
 
@@ -112,14 +106,14 @@ def main(_):
             return
         # 5.feed data, to get logits
         number_of_training_data = len(testX2)
-        print("number_of_training_data:", number_of_training_data)
+        print("number_of_predict_data:", number_of_training_data)
         batch_size = 1
         index = 0
         predict_target_file_f = codecs.open(FLAGS.predict_target_file, 'a', 'utf8')
         for start, end in zip(range(0, number_of_training_data, batch_size), range(batch_size, number_of_training_data+1, batch_size)):
-            logits = sess.run(fast_text.logits, feed_dict={fast_text.title: testX2[start:end]})  # 'shape of logits:', ( 1, 1999)
+            logits = sess.run(fast_text.logits, feed_dict={fast_text.sentence: testX2[start:end]})  # 'shape of logits:', ( 1, 1999)
             # 6. get lable using logtis
-            predicted_labels = get_label_using_logits(logits[0],idx2label)
+            predicted_labels = get_label_using_logits(logits[0], idx2label)
             # 7. write question id and labels to file system.
             write_question_id_with_labels(question_id_list[index], predicted_labels, predict_target_file_f)
             index = index+1

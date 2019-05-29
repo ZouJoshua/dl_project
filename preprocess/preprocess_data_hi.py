@@ -18,12 +18,12 @@ import numpy as np
 import h5py
 from sklearn.model_selection import StratifiedKFold
 from gensim.models import KeyedVectors
-from preprocess.preprocess_utils import read_json_format_file, split_text
+from preprocess.preprocess_utils import read_json_format_file, split_text, get_ngrams
 
 
 class DataSet(object):
 
-    def __init__(self, data_dir, word2vec_file, training_data_file, embedding_dims=300):
+    def __init__(self, data_dir, word2vec_file, training_data_file=None, embedding_dims=300):
         """
         数据预处理
         :param data_dir: 数据资源目录
@@ -33,7 +33,8 @@ class DataSet(object):
         """
         self.data_dir = data_dir
         self.word2vec_path = word2vec_file
-        self.raw_data_path = training_data_file
+        if not training_data_file:
+            self.raw_data_path = training_data_file
         self.embedding = None
         self.embed_dim = embedding_dims
         self.word2index, self.index2word, self.word2embed = self.create_vocabulary(embedding_dims=self.embed_dim)
@@ -177,6 +178,40 @@ class DataSet(object):
         train, test = self.stratified_sampling(X, Y, valid_portion)
         print("load_data ended...")
         return train, test, test
+
+    def load_data_predict(self, predict_data_path, word2index, n_gram=False):
+        # 1. load raw data
+        print("load_data_predict.started...")
+        print("load_data.predict_data_path:", predict_data_path)
+        lines = read_json_format_file(predict_data_path)
+        # 2.transform X as indices
+        """
+        #todo: 去掉停用词 -> 统计词频 -> 去除低频词
+        """
+        # 3.transform  y as scalar
+        predict_x = []
+
+        for i, line in enumerate(lines):
+            title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
+            content = line["content"].strip()
+            doc_id = line["id"]
+            x = title + " " + content
+            # 打印前几条
+            if i < 2:
+                print("x{}:".format(i), x)  # get raw x
+            if n_gram:
+                x_ = get_ngrams(x)
+                x = split_text(x_)
+            else:
+                x = split_text(x)
+            x = [word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
+            if i < 2:
+                print("x{}-word-index:".format(i), x)  # word to index
+            predict_x.append((doc_id, x))
+        number_examples = len(predict_x)
+        print("number_examples:", number_examples)  #
+        return predict_x
+
 
     def get_embedding(self, word2embed):
         vocab_size = len(word2embed)
