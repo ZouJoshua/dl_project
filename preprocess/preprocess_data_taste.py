@@ -175,8 +175,7 @@ class DataSet(object):
             y = self.label2index[y]
             X.append(x)
             Y.append(y)
-            if i == 10000:
-                break
+
 
         # 4.split to train,test and valid data(基于y标签分层)
         doc_num = len(X)
