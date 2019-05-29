@@ -28,7 +28,8 @@ from gensim.models import KeyedVectors
 from preprocess.preprocess_data_hi import DataSet
 
 
-data_dir = os.path.join(root_dir, "data", "hi_news")
+# data_dir = os.path.join(root_dir, "data", "hi_news")
+data_dir = "/data/zoushuai/hi_news/model_train"
 training_data_file = os.path.join(data_dir, "top_category_corpus")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
 model_checkpoint = os.path.join(data_dir, "fasttext_checkpoint")
@@ -53,10 +54,10 @@ tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 
 tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.8, "to control the activation level of neurons")
 tf.flags.DEFINE_string("ckpt_dir", model_checkpoint, "checkpoint location for the model")
-tf.flags.DEFINE_integer("sentence_len", 200, "max sentence length")
+tf.flags.DEFINE_integer("sentence_len", 300, "max sentence length")
 tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
 tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
-tf.flags.DEFINE_integer("num_epochs", 20, "epoch times")
+tf.flags.DEFINE_integer("num_epochs", 25, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
 
