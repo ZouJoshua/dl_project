@@ -33,7 +33,7 @@ class DataSet(object):
         """
         self.data_dir = data_dir
         self.word2vec_path = word2vec_file
-        if not training_data_file:
+        if training_data_file:
             self.raw_data_path = training_data_file
         self.embedding = None
         self.embed_dim = embedding_dims
