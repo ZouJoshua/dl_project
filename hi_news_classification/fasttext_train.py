@@ -136,68 +136,7 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
 
 
 
-def tf_confusion_metrics(predict, real, session):
-    predictions = tf.argmax(predict, 1)
-    actuals = tf.argmax(real, 1)
 
-    ones_like_actuals = tf.ones_like(actuals)
-    zeros_like_actuals = tf.zeros_like(actuals)
-    ones_like_predictions = tf.ones_like(predictions)
-    zeros_like_predictions = tf.zeros_like(predictions)
-
-    tp_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, ones_like_actuals),
-                tf.equal(predictions, ones_like_predictions)
-            ),
-            "float"
-        )
-    )
-
-    tn_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, zeros_like_actuals),
-                tf.equal(predictions, zeros_like_predictions)
-            ),
-            "float"
-        )
-    )
-
-    fp_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, zeros_like_actuals),
-                tf.equal(predictions, ones_like_predictions)
-            ),
-            "float"
-        )
-    )
-
-    fn_op = tf.reduce_sum(
-        tf.cast(
-            tf.logical_and(
-                tf.equal(actuals, ones_like_actuals),
-                tf.equal(predictions, zeros_like_predictions)
-            ),
-            "float"
-        )
-    )
-    tp, tn, fp, fn = session.run([tp_op, tn_op, fp_op, fn_op])
-
-    tpr = float(tp) / (float(tp) + float(fn))
-    fpr = float(fp) / (float(fp) + float(tn))
-    fnr = float(fn) / (float(tp) + float(fn))
-
-    accuracy = (float(tp) + float(tn)) / (float(tp) + float(fp) + float(fn) + float(tn))
-
-    recall = tpr
-    precision = float(tp) / (float(tp) + float(fp))
-
-    f1_score = (2 * (precision * recall)) / (precision + recall)
-
-    return accuracy, recall, precision, f1_score
 
 
 
@@ -207,7 +146,7 @@ def export_model(session, fast_text, export_path):
    #只需要修改这一段，定义输入输出，其他保持默认即可
     prediction_signature = tf.saved_model.signature_def_utils.build_signature_def(
         inputs={"input": tf.saved_model.utils.build_tensor_info(fast_text.sentence)},
-        outputs={"output": tf.saved_model.utils.build_tensor_info(fast_text.label)},
+        outputs={"output": tf.saved_model.utils.build_tensor_info(fast_text.logits)},
         method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
 
     if os.path.exists(export_path):
@@ -229,6 +168,49 @@ def export_model(session, fast_text, export_path):
         builder.save()
     except Exception as e:
         print("Fail to export saved model, exception: {}".format(e))
+
+
+
+def freeze_graph(model_folder):
+    """
+
+    :param model_folder:
+    :param output_graph: PB模型保存路径
+    :return:
+    """
+    if os.path.exists(model_folder):
+        ckpt = tf.train.get_checkpoint_state(model_folder)  # 检查目录下ckpt文件状态是否可用
+        input_checkpoint = ckpt.model_checkpoint_path  # 得ckpt文件路径
+        if ckpt and input_checkpoint:
+            print("存在ckpt文件：{}".format(input_checkpoint))
+    else:
+        raise FileNotFoundError("模型ckpt路径未找到，请检查")
+    output_dir = os.path.join(os.path.dirname(model_folder), "frozen_model")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_graph = os.path.join(output_dir, "frozen_model.pb")
+    # 指定模型输出, 这样可以允许自动裁剪无关节点(原模型输出操作节点的名字)
+    output_nodes = ["accuracy/predictions"]
+    saver = tf.train.import_meta_graph(input_checkpoint + '.meta', clear_devices=True)
+    graph = tf.get_default_graph()  # 获得默认的图
+
+    with tf.Session(graph=graph) as sess:
+        # 序列化模型
+        input_graph_def = sess.graph.as_graph_def()
+        # 载入权重
+        saver.restore(sess, input_checkpoint)
+        # 转换变量为常量
+        output_graph_def = tf.graph_util.convert_variables_to_constants(  # 模型持久化，将变量值固定
+            sess=sess,
+            input_graph_def=input_graph_def,  # 等于:sess.graph_def
+            output_node_names=output_nodes)
+
+        with tf.gfile.GFile(output_graph, "wb") as f:  # 保存模型
+            f.write(output_graph_def.SerializeToString())  # 序列化输出
+        print("%d ops in the final graph." % len(output_graph_def.node))
+
+        for op in graph.get_operations():
+            print(op.name, op.values())
 
 
 
@@ -372,6 +354,7 @@ def main(_):
 
 
 if __name__ == "__main__":
-    tf.app.run()
+    # tf.app.run()
     # print(current_work_dir)
     # print(root_dir)
+    freeze_graph("/home/zoushuai/algoproject/tf_project/data/hi_news/fasttext_checkpoint")

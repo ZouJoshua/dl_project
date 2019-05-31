@@ -18,7 +18,7 @@ import numpy as np
 import h5py
 from sklearn.model_selection import StratifiedKFold
 from gensim.models import KeyedVectors
-from preprocess.preprocess_utils import read_json_format_file, split_text, get_ngrams
+from preprocess.preprocess_utils import read_json_format_file, split_text, get_ngrams, write_json_format_file
 
 
 class DataSet(object):
@@ -51,6 +51,7 @@ class DataSet(object):
         print("cache_path:", cache_path, "file_exists:", os.path.exists(cache_path))
 
         if os.path.exists(cache_path):  # 如果缓存文件存在，则直接读取
+            print("building vocabulary from cache file: {}".format(cache_path))
             with open(cache_path, 'rb') as data_f:
                 _word2idx, _idx2word, _word2embed = pickle.load(data_f)
                 return _word2idx, _idx2word, _word2embed
@@ -92,15 +93,16 @@ class DataSet(object):
         :param training_data_path: 带label的训练语料
         :return: label2idx和idx2label
         """
-        print("building vocabulary_label_sorted. training_data:", self.raw_data_path)
         cache_path = os.path.join(self.data_dir, "label_vocabulary.pik")
         print("cache_path:", cache_path, "file_exists:", os.path.exists(cache_path))
 
         if os.path.exists(cache_path):  # 如果缓存文件存在，则直接读取
+            print("building vocabulary_label from cache file...")
             with open(cache_path, 'rb') as data_f:
                 _label2idx, _idx2label = pickle.load(data_f)
                 return _label2idx, _idx2label
         else:
+            print("building vocabulary_label_sorted. training_data:", self.raw_data_path)
             _label2idx = dict()
             _idx2label = dict()
             label_count_dict = dict()  # {label:count} 统计各类别的样本数
@@ -175,15 +177,19 @@ class DataSet(object):
         # 4.split to train,test and valid data(基于y标签分层)
         doc_num = len(X)
         print("number_doc:", doc_num)
-        train, test = self.stratified_sampling(X, Y, valid_portion)
+        train, test = self.stratified_sampling(X, Y, lines, valid_portion)
         print("load_data ended...")
         return train, test, test
 
     def load_data_predict(self, predict_data_path, word2index, n_gram=False):
         # 1. load raw data
         print("load_data_predict.started...")
-        print("load_data.predict_data_path:", predict_data_path)
-        lines = read_json_format_file(predict_data_path)
+        if predict_data_path:
+            predict_file = predict_data_path
+        else:
+            predict_file = self.corpus_predict_file
+        print("load_data.predict_data_path:", predict_file)
+        lines = read_json_format_file(predict_file)
         # 2.transform X as indices
         """
         #todo: 去掉停用词 -> 统计词频 -> 去除低频词
@@ -222,8 +228,8 @@ class DataSet(object):
         word_embedding = np.array(word_embedding_list)
         return word_embedding
 
-    def stratified_sampling(self, x, y, valid_portion):
-
+    def stratified_sampling(self, x, y, all_data, valid_portion=0.2):
+        self.corpus_predict_file = os.path.join(self.data_dir, "corpus_predict")
         skf = StratifiedKFold(n_splits=int(1/valid_portion))
         i = 0
         for train_index, test_index in skf.split(x, y):
@@ -243,6 +249,8 @@ class DataSet(object):
                 trainy = [y[i] for i in train_index]
                 testx = [x[j] for j in test_index]
                 testy = [y[j] for j in test_index]
+                corpus_pred = [all_data[i] for i in test_index]
+                write_json_format_file(corpus_pred, self.corpus_predict_file)
                 return (trainx, trainy), (testx, testy)
 
     def load_data_from_h5py(self, cache_file_h5py, cache_file_pickle):

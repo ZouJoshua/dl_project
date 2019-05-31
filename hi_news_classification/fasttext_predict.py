@@ -64,8 +64,103 @@ tf.flags.DEFINE_boolean("is_training", False, "true:training, false:testing/infe
 tf.flags.DEFINE_integer("num_epochs", 20, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
-tf.flags.DEFINE_string("predict_source_file", predict_result_file, "target file path for final prediction")
-tf.flags.DEFINE_string("predict_target_file", predict_data_file, "target file path for final prediction")
+tf.flags.DEFINE_string("predict_source_file", predict_data_file, "target file path for final prediction")
+tf.flags.DEFINE_string("predict_target_file", predict_result_file, "target file path for final prediction")
+tf.flags.DEFINE_boolean("load_pb_model_flag", True, "if load pb model or load ckpt model")
+
+
+def predict_from_pb_model(testX2, id_list, idx2label, session, model_path, savedmodel=False):
+    if savedmodel:
+        output_graph_def = tf.GraphDef()
+        with open(model_path + "/frozen_model.pb", "rb") as f:
+            output_graph_def.ParseFromString(f.read())
+            tensors = tf.import_graph_def(output_graph_def, name="")
+        init = tf.global_variables_initializer()
+        session.run(init)
+        print("load model finish!")
+        input = session.graph.get_tensor_by_name("sentence:0")
+        output = session.graph.get_tensor_by_name("accuracy/predictions:0")
+        # 测试pb模型
+        predict_target_file_f = codecs.open(FLAGS.predict_target_file, 'a', 'utf8')
+        for i, test_x in enumerate(testX2):
+            feed_dict_map = {input: [test_x]}
+            predict = session.run(output, feed_dict=feed_dict_map)
+            _id = id_list[i]
+            # write_labels_file(_id, predict_y, predict_target_file_f)
+            label = idx2label.get(predict[0], None)
+            write_labels_file(_id, label, predict_target_file_f)
+            # print("{},{}".format(_id, label))
+        predict_target_file_f.close()
+    else:
+        meta_graph = tf.saved_model.loader.load(session, [tf.saved_model.tag_constants.SERVING], model_path)
+        model_graph_signature = list(meta_graph.signature_def.items())[0][1]
+        output_tensor_names = []
+        output_op_names = []
+        for output_item in model_graph_signature.outputs.items():
+            output_op_name = output_item[0]
+            print(output_op_name)
+            output_op_names.append(output_op_name)
+            output_tensor_name = output_item[1].name
+            output_tensor_names.append(output_tensor_name)
+        print("load model finish!")
+        sentences = {}
+        # 测试pb模型
+        predict_target_file_f = codecs.open(FLAGS.predict_target_file, 'a', 'utf8')
+        for i, test_x in enumerate(testX2):
+            sentences["input"] = [test_x]
+            feed_dict_map = {}
+            for input_item in model_graph_signature.inputs.items():
+                input_op_name = input_item[0]
+                input_tensor_name = input_item[1].name
+                feed_dict_map[input_tensor_name] = sentences[input_op_name]
+            logits = session.run(output_tensor_names, feed_dict=feed_dict_map)
+            label = get_label_from_logits(logits[0], idx2label)
+            _id = id_list[i]
+            write_labels_file(_id, label, predict_target_file_f)
+            # print("predict y:", label)
+        predict_target_file_f.close()
+
+def predict_from_ckpt_model(testX2, id_list, idx2label, session, vocab_size):
+    # Instantiate Model
+    fast_text = FastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+                         FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
+                         FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
+
+    saver = tf.train.Saver()
+    if os.path.exists(FLAGS.ckpt_dir):
+        print("Restoring Variables from Checkpoint")
+        saver.restore(session, tf.train.latest_checkpoint(FLAGS.ckpt_dir))
+    else:
+        print("Can't find the checkpoint.going to stop")
+        return
+    # feed data, to get logits
+    number_of_training_data = len(testX2)
+    print("number_of_predict_data:", number_of_training_data)
+    batch_size = 1
+    predict_target_file_f = codecs.open(FLAGS.predict_target_file, 'a', 'utf8')
+    for start, end in zip(range(0, number_of_training_data, batch_size),
+                          range(batch_size, number_of_training_data + 1, batch_size)):
+        logits = session.run(fast_text.logits,
+                          feed_dict={fast_text.sentence: testX2[start:end]})  # 'shape of logits:', ( 1, 1999)
+        label = get_label_from_logits(logits[0], idx2label)
+        _id = id_list[start]
+        write_labels_file(_id, label, predict_target_file_f)
+    predict_target_file_f.close()
+
+
+# get label using logits
+def get_label_from_logits(logits, index2label):
+    y_pred = np.argmax(logits)
+    label = index2label.get(y_pred, None)
+    return label
+
+
+# write question id and labels to file system.
+def write_labels_file(_id, label, f):
+    f.write(_id + "," + label + "\n")
+    sys.stdout.flush()
+    f.flush()
+
 
 
 def main(_):
@@ -73,10 +168,12 @@ def main(_):
 
     # step1 -> load data
     ds = DataSet(data_dir, word2vec_file, embedding_dims=FLAGS.embed_size)
-    data = ds.load_data_predict(FLAGS.predict_source_file)
+    word2idx = ds.word2index
+    idx2label = ds.index2label
+    data = ds.load_data_predict(FLAGS.predict_source_file, word2idx)
     predict_data = list()
     id_list = list()
-    vocab_size = len(ds.word2index)
+    vocab_size = len(word2idx)
     print("fasttext_model.vocab_size:", vocab_size)
     for doc in data:
         doc_id, pred_data = doc
@@ -89,54 +186,21 @@ def main(_):
     print("end padding...")
 
     # 3.create session.
-    config = tf.ConfigProto()
-    # config.gpu_options.allow_growth = True
-    with tf.Session(config=config) as sess:
-        # 4.Instantiate Model
-        fast_text = FastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
-                             FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
-                             FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
-
-        saver = tf.train.Saver()
-        if os.path.exists(FLAGS.ckpt_dir + "checkpoint"):
-            print("Restoring Variables from Checkpoint")
-            saver.restore(sess, tf.train.latest_checkpoint(FLAGS.ckpt_dir))
-        else:
-            print("Can't find the checkpoint.going to stop")
-            return
-        # 5.feed data, to get logits
-        number_of_training_data = len(testX2)
-        print("number_of_predict_data:", number_of_training_data)
-        batch_size = 1
-        index = 0
-        predict_target_file_f = codecs.open(FLAGS.predict_target_file, 'a', 'utf8')
-        for start, end in zip(range(0, number_of_training_data, batch_size), range(batch_size, number_of_training_data+1, batch_size)):
-            logits = sess.run(fast_text.logits, feed_dict={fast_text.sentence: testX2[start:end]})  # 'shape of logits:', ( 1, 1999)
-            # 6. get lable using logtis
-            predicted_labels = get_label_using_logits(logits[0], idx2label)
-            # 7. write question id and labels to file system.
-            write_question_id_with_labels(question_id_list[index], predicted_labels, predict_target_file_f)
-            index = index+1
-        predict_target_file_f.close()
+    with tf.Graph().as_default():
+        config = tf.ConfigProto()
+        # config.gpu_options.allow_growth = True
+        # 定义会话
+        sess = tf.Session(config=config)
+        with sess.as_default():
+            if FLAGS.load_pb_model_flag:
+                model_path = "/home/zoushuai/algoproject/tf_project/data/hi_news/frozen_model"
+                predict_from_pb_model(testX2, id_list, idx2label, sess, model_path, savedmodel=True)
+            else:
+                predict_from_ckpt_model(testX2, id_list, idx2label, sess, vocab_size)
 
 
-# get label using logits
-def get_label_using_logits(logits, vocabulary_index2word_label, top_number=5):
-    # test
-    # print("sum_p", np.sum(1.0 / (1 + np.exp(-logits))))
-    index_list = np.argsort(logits)[-top_number:]
-    index_list = index_list[::-1]
-    label_list = []
-    for index in index_list:
-        label = vocabulary_index2word_label[index]
-        label_list.append(label)  # ('get_label_using_logits.label_list:', [u'-3423450385060590478', u'2838091149470021485', u'-3174907002942471215', u'-1812694399780494968', u'6815248286057533876'])
-    return label_list
 
 
-# write question id and labels to file system.
-def write_question_id_with_labels(question_id, labels_list, f):
-    labels_string = ",".join(labels_list)
-    f.write(question_id+","+labels_string + "\n")
 
 if __name__ == "__main__":
     tf.app.run()

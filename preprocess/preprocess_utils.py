@@ -30,6 +30,23 @@ def read_json_format_file(file):
                 line = json.loads(_line.strip())
                 yield line
 
+def write_json_format_file(source_data, file):
+    """
+    写每行为json格式的文件
+    :param source_data:
+    :param file:
+    :return:
+    """
+    f = open(file, "w")
+    for _line in source_data:
+        if isinstance(_line, dict):
+            line = json.dumps(_line)
+            f.write(line + "\n")
+        elif isinstance(_line, str):
+            f.write(_line + "\n")
+    f.close()
+
+
 def read_txt_file(file):
     """
     读取txt格式的文本
