@@ -63,7 +63,7 @@ class TextCNN(object):
 
     def init_weights(self):
         """define all weights here"""
-        with tf.name_scope("embedding"):
+        with tf.name_scope("embedding_layer"):
             self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
             self.w = tf.get_variable("w", shape=[self.num_filters_total, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
             self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
@@ -100,9 +100,10 @@ class TextCNN(object):
         # step5.dropout
         for i, filter_size in enumerate(self.filter_sizes):
             # with tf.name_scope("convolution-pooling-%s" %filter_size):
-            with tf.variable_scope("convolution-pooling-%s" % filter_size):
+            with tf.variable_scope("convolution_pooling_layer_{}".format(filter_size)):
+                filter_shape = [filter_size, self.embed_size, 1, self.num_filters]
                 # step1.create filter
-                filter = tf.get_variable("filter-%s" % filter_size, [filter_size, self.embed_size, 1, self.num_filters], initializer=self.initializer)
+                filter = tf.get_variable("filter-{}".format(filter_size), filter_shape, initializer=self.initializer)
                 # step2.conv operation
                 # conv2d ===> computes a 2-D convolution given 4-D `input` and `filter` tensors.
                 # *num_filters ---> [1, sentence_len - filter_size + 1, 1, num_filters]
@@ -111,8 +112,8 @@ class TextCNN(object):
                 # input: [batch, in_height, in_width, in_channels]，
                 # filter/kernel: [filter_height, filter_width, in_channels, out_channels]
                 # output: 4-D [1,sequence_length-filter_size+1,1,1]，得到的是w.x的部分的值
-                conv = tf.nn.conv2d(self.sentence_embeddings_expanded, filter, strides=[1, 1, 1, 1], padding="VALID", name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
-                conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training_flag, scope='cnn_bn_')
+                conv = tf.nn.conv2d(self.sentence_embeddings_expanded, filter, strides=[1, 1, 1, 1], padding="VALID", name="conv-{}".format(filter_size))  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
+                # conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training_flag, scope='cnn_bn_')
 
                 # step3.apply nolinearity
                 # h是最终卷积层的输出，即每个feature map，shape = [batch_size, sentence_len - filter_size + 1, 1, num_filters]
