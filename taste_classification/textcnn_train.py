@@ -48,7 +48,7 @@ tf.flags.DEFINE_string("cache_file_pickle", cache_file_pickle, "path of vocabula
 tf.flags.DEFINE_integer("label_size", 4, "number of label")
 tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
 tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
-tf.flags.DEFINE_integer("decay_steps", 20000, "how many steps before decay learning rate")
+tf.flags.DEFINE_integer("decay_steps", 1000, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 一次衰减多少
 tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "to control the activation level of neurons")
@@ -59,7 +59,7 @@ tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/infer
 tf.flags.DEFINE_integer("num_epochs", 2, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
-tf.flags.DEFINE_integer("num_filters", 64, "number of filters")
+tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
 
 filter_sizes = [3, 4, 5]
 

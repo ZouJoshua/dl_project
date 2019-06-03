@@ -45,28 +45,26 @@ class TextCNN(object):
         self.num_filters_total = self.num_filters * len(filter_sizes)  # how many filters totally.
         self.clip_gradients = clip_gradients
 
+        self.global_step = tf.Variable(0, trainable=False, name="global_step")
+        self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
+        self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
+
+        self.build_graph()
+
+    def add_placeholders(self):
         self.sentence = tf.placeholder(tf.int32, [None, self.sentence_len], name="sentence")  # X
         self.label = tf.placeholder(tf.int32, [None, ], name="label")  # y:[None,label_size]
         # self.input_y_multilabel = tf.placeholder(tf.float32, [None, self.label_size], name="input_y_multilabel")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
-        self.global_step = tf.Variable(0, trainable=False, name="global_step")
-        self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
-        self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
-
-        self.init_weights()
-        self.logits = self.inference()
-        self.loss_val = self.loss()
-        self.train_op = self.train()
-        self.accuracy = self.acc()
 
 
     def init_weights(self):
         """define all weights here"""
         with tf.name_scope("embedding_layer"):
             self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
-            self.w = tf.get_variable("w", shape=[self.num_filters_total, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
-            self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
+        self.w = tf.get_variable("w", shape=[self.num_filters_total, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
+        self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
 
     def inference(self):
         """
@@ -84,7 +82,7 @@ class TextCNN(object):
         print("use single layer CNN")
         h = self.cnn_single_layer()
         # 5. logits(use linear layer)and predictions(argmax)
-        with tf.name_scope("output"):
+        with tf.variable_scope('fully_connection_layer'):
             logits = tf.matmul(h, self.w) + self.b  # shape:[None, self.num_classes]==tf.matmul([None,self.embed_size],[self.embed_size,self.num_classes])
         return logits
 
@@ -130,10 +128,10 @@ class TextCNN(object):
         self.h_pool_flat = tf.reshape(self.h_pool, [-1, self.num_filters_total])  # shape should be:[None,num_filters_total]. here this operation has some result as tf.sequeeze().e.g. x's shape:[3,3];tf.reshape(-1,x) & (3, 3)---->(1,9)
 
         # step5. add dropout: use tf.nn.dropout
-        with tf.name_scope("dropout"):
-            self.h_drop = tf.nn.dropout(self.h_pool_flat, keep_prob=self.dropout_keep_prob)  # [None,num_filters_total]
-        h = tf.layers.dense(self.h_drop, self.num_filters_total, activation=tf.nn.tanh, use_bias=True)
-        return h
+        with tf.name_scope("dropout_layer"):
+            h_ = tf.nn.dropout(self.h_pool_flat, keep_prob=self.dropout_keep_prob)  # [None,num_filters_total]
+        # h_ = tf.layers.dense(h_, self.num_filters_total, activation=tf.nn.tanh, use_bias=True)
+        return h_
 
 
     def cnn_multiple_layers(self):
@@ -233,3 +231,13 @@ class TextCNN(object):
         with tf.control_dependencies(update_ops):
             train_op = optimizer.apply_gradients(zip(gradients, variables))
         return train_op
+
+    def build_graph(self):
+        self.add_placeholders()
+        self.init_weights()
+        self.logits = self.inference()
+        self.loss_val = self.loss()
+        self.train_op = self.train()
+        self.accuracy = self.acc()
+
+
