@@ -27,8 +27,8 @@ from gensim.models import KeyedVectors
 from preprocess.preprocess_data_taste import DataSet
 
 
-# data_dir = os.path.join(root_dir, "data", "en_news")
-data_dir = "/data/zoushuai/taste_category_data"
+data_dir = os.path.join(root_dir, "data", "en_news")
+# data_dir = "/data/zoushuai/taste_category_data"
 training_data_file = os.path.join(data_dir, "train_corpus_taste")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
 model_checkpoint = os.path.join(data_dir, "textcnn_checkpoint")
