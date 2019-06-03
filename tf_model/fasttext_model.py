@@ -71,6 +71,8 @@ class FastText(object):
             self.embeddings_output = tf.reduce_mean(embedding_inputs, axis=1)
         # 输出层
         logits = tf.matmul(self.embeddings_output, self.w) + self.b
+        # softmax output
+        # logits = tf.nn.softmax(tf.matmul(self.embeddings_output, self.w) + self.b, name='logits')
         return logits
 
     def nce_loss(self, l2_lambda=0.001):

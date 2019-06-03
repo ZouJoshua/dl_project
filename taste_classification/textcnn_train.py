@@ -22,7 +22,7 @@ warnings.filterwarnings('ignore')
 
 from tf_model.textcnn_model import TextCNN
 from tflearn.data_utils import pad_sequences
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 from gensim.models import KeyedVectors
 from preprocess.preprocess_data_taste import DataSet
 
@@ -46,7 +46,7 @@ tf.flags.DEFINE_string("cache_file_h5py", cache_file_h5py, "path of training/val
 tf.flags.DEFINE_string("cache_file_pickle", cache_file_pickle, "path of vocabulary and label files")
 
 tf.flags.DEFINE_integer("label_size", 4, "number of label")
-tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
+tf.flags.DEFINE_float("learning_rate", 0.05, "learning rate")
 tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
 tf.flags.DEFINE_integer("decay_steps", 1000, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 一次衰减多少
@@ -59,7 +59,7 @@ tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/infer
 tf.flags.DEFINE_integer("num_epochs", 2, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
-tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
+tf.flags.DEFINE_integer("num_filters", 64, "number of filters")
 
 filter_sizes = [3, 4, 5]
 
@@ -111,6 +111,22 @@ def gen_metrics(y_true, y_pred, logits):
     f1 = f1_score(y_true, y_pred, average='macro')
 
     return round(accuracy, 4), round(auc, 4), round(precision, 4), round(recall, 4), round(f1, 4)
+
+
+def report_(y_true_cls, y_pred_cls):
+    """
+    报告准确率、f1值
+    :param y_true_cls: one-hot
+    :param y_pred_cls:
+    :return:
+    """
+    categories = list()
+    print("Precision, Recall and F1-Score...")
+    result_report = classification_report(y_true_cls, y_pred_cls, target_names=categories)
+    print("Confusion Matrix...")
+    cm = confusion_matrix(y_true_cls, y_pred_cls)
+    print(cm)
+    return result_report, cm
 
 
 # 在验证集上做验证，计算损失、精确度
