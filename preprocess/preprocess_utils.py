@@ -37,8 +37,13 @@ def write_json_format_file(source_data, file):
     :param file:
     :return:
     """
+    print(">>>>> 正在写入目标数据文件：{}".format(file))
     f = open(file, "w")
+    _count = 0
     for _line in source_data:
+        _count += 1
+        if _count % 100000 == 0:
+            print("<<<<< 已写入{}行".format(_count))
         if isinstance(_line, dict):
             line = json.dumps(_line)
             f.write(line + "\n")
