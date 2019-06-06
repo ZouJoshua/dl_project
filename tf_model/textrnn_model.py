@@ -9,6 +9,8 @@
 
 import tensorflow as tf
 
+from tensorflow.contrib import rnn
+
 
 class TextRNN(object):
     def __init__(self,
@@ -36,13 +38,9 @@ class TextRNN(object):
 
         self.filter_sizes = filter_sizes  # it is a list of int. e.g. [3,4,5]
         self.num_filters = num_filters
-        self.initializer = tf.random_normal_initializer(stddev=0.1)
+
         self.num_filters_total = self.num_filters * len(filter_sizes)  # how many filters totally.
         self.clip_gradients = clip_gradients
-
-        self.global_step = tf.Variable(0, trainable=False, name="global_step")
-        self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
-        self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
 
         self.build_graph()
 
@@ -53,9 +51,9 @@ class TextRNN(object):
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
 
-
     def init_weights(self):
         """define all weights here"""
+        self.initializer = tf.random_normal_initializer(stddev=0.1)
         with tf.name_scope("embedding_layer"):
             self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
         self.w = tf.get_variable("w", shape=[self.num_filters_total, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
@@ -81,52 +79,84 @@ class TextRNN(object):
             logits = tf.matmul(h, self.w) + self.b  # shape:[None, self.num_classes]==tf.matmul([None,self.embed_size],[self.embed_size,self.num_classes])
         return logits
 
+    def single_layer_static_lstm(self, input_x, n_steps, n_hidden):
+        '''
+        返回静态单层LSTM单元的输出，以及cell状态
 
-    def cnn_single_layer(self):
-        pooled_outputs = []
-        # loop each filter size
-        # for each filter, do: convolution-pooling layer, feature shape is 4-d. Feature is a new variable
-        # step1.create filters
-        # step2.conv (CNN->BN->relu)
-        # step3.apply nolinearity(tf.nn.relu)
-        # step4.max-pooling(tf.nn.max_pool)
-        # step5.dropout
-        for i, filter_size in enumerate(self.filter_sizes):
-            # with tf.name_scope("convolution-pooling-%s" %filter_size):
-            with tf.variable_scope("convolution_pooling_layer_{}".format(filter_size)):
-                filter_shape = [filter_size, self.embed_size, 1, self.num_filters]
-                # step1.create filter
-                filter = tf.get_variable("filter-{}".format(filter_size), filter_shape, initializer=self.initializer)
-                # step2.conv operation
-                # conv2d ===> computes a 2-D convolution given 4-D `input` and `filter` tensors.
-                # *num_filters ---> [1, sentence_len - filter_size + 1, 1, num_filters]
-                # *batch_size ---> [batch_size, sentence_len - filter_size + 1, 1, num_filters]
-                # conv2d函数的参数：
-                # input: [batch, in_height, in_width, in_channels]，
-                # filter/kernel: [filter_height, filter_width, in_channels, out_channels]
-                # output: 4-D [1,sequence_length-filter_size+1,1,1]，得到的是w.x的部分的值
-                conv = tf.nn.conv2d(self.sentence_embeddings_expanded, filter, strides=[1, 1, 1, 1], padding="VALID", name="conv-{}".format(filter_size))  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
-                # conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training_flag, scope='cnn_bn_')
+        args:
+            input_x:输入张量 形状为[batch_size,n_steps,n_input]
+            n_steps:时序总数
+            n_hidden：LSTM单元输出的节点个数 即隐藏层节点数
+        '''
 
-                # step3.apply nolinearity
-                # h是最终卷积层的输出，即每个feature map，shape = [batch_size, sentence_len - filter_size + 1, 1, num_filters]
-                b = tf.get_variable("b-%s" % filter_size, [self.num_filters])
-                h = tf.nn.relu(tf.nn.bias_add(conv, b), "relu")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
-                # step4.max-pooling.
-                # value: A 4-D `Tensor` with shape `[batch, height, width, channels]
-                # ksize: A list of ints that has length >= 4.
-                # strides: A list of ints that has length >= 4.
-                pooled = tf.nn.max_pool(h, ksize=[1, self.sentence_len - filter_size + 1, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name="pool")  # shape:[batch_size, 1, 1, num_filters].max_pool:performs the max pooling on the input.
-                pooled_outputs.append(pooled)
-        # step4. combine all pooled features, and flatten the feature.output' shape is a [1,None]
-        self.h_pool = tf.concat(pooled_outputs, 3)  # shape:[batch_size, 1, 1, num_filters_total]. tf.concat=>concatenates tensors along one dimension.where num_filters_total=num_filters_1+num_filters_2+num_filters_3
-        self.h_pool_flat = tf.reshape(self.h_pool, [-1, self.num_filters_total])  # shape should be:[None,num_filters_total]. here this operation has some result as tf.sequeeze().e.g. x's shape:[3,3];tf.reshape(-1,x) & (3, 3)---->(1,9)
+        # 把输入input_x按列拆分，并返回一个有n_steps个张量组成的list 如batch_sizex28x28的输入拆成[(batch_size,28),((batch_size,28))....]
+        # 如果是调用的是静态rnn函数，需要这一步处理   即相当于把序列作为第一维度
+        input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
 
-        # step5. add dropout: use tf.nn.dropout
-        with tf.name_scope("dropout_layer"):
-            h_ = tf.nn.dropout(self.h_pool_flat, keep_prob=self.dropout_keep_prob)  # [None,num_filters_total]
-        # h_ = tf.layers.dense(h_, self.num_filters_total, activation=tf.nn.tanh, use_bias=True)
-        return h_
+        # 可以看做隐藏层
+        lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden, forget_bias=1.0)
+        # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+        hiddens, states = tf.contrib.rnn.static_rnn(cell=lstm_cell, inputs=input_x1, dtype=tf.float32)
+
+        return hiddens, states
+
+    def single_layer_static_gru(self, input_x, n_steps, n_hidden):
+        '''
+        返回静态单层GRU单元的输出，以及cell状态
+
+        args:
+            input_x:输入张量 形状为[batch_size,n_steps,n_input]
+            n_steps:时序总数
+            n_hidden：gru单元输出的节点个数 即隐藏层节点数
+        '''
+
+        # 把输入input_x按列拆分，并返回一个有n_steps个张量组成的list 如batch_sizex28x28的输入拆成[(batch_size,28),((batch_size,28))....]
+        # 如果是调用的是静态rnn函数，需要这一步处理   即相当于把序列作为第一维度
+        input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+
+        # 可以看做隐藏层
+        gru_cell = tf.contrib.rnn.GRUCell(num_units=n_hidden)
+        # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+        hiddens, states = tf.contrib.rnn.static_rnn(cell=gru_cell, inputs=input_x1, dtype=tf.float32)
+
+        return hiddens, states
+
+    def single_layer_dynamic_lstm(self, input_x, n_steps, n_hidden):
+        '''
+        返回动态单层LSTM单元的输出，以及cell状态
+
+        args:
+            input_x:输入张量  形状为[batch_size,n_steps,n_input]
+            n_steps:时序总数
+            n_hidden：LSTM单元输出的节点个数 即隐藏层节点数
+        '''
+        # 可以看做隐藏层
+        lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden, forget_bias=1.0)
+        # 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出也是这种形状
+        hiddens, states = tf.nn.dynamic_rnn(cell=lstm_cell, inputs=input_x, dtype=tf.float32)
+
+        # 注意这里输出需要转置  转换为时序优先的
+        hiddens = tf.transpose(hiddens, [1, 0, 2])
+        return hiddens, states
+
+    def single_layer_dynamic_gru(self, input_x, n_steps, n_hidden):
+        '''
+        返回动态单层GRU单元的输出，以及cell状态
+
+        args:
+            input_x:输入张量 形状为[batch_size,n_steps,n_input]
+            n_steps:时序总数
+            n_hidden：gru单元输出的节点个数 即隐藏层节点数
+        '''
+
+        # 可以看做隐藏层
+        gru_cell = tf.contrib.rnn.GRUCell(num_units=n_hidden)
+        # 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出也是这种形状
+        hiddens, states = tf.nn.dynamic_rnn(cell=gru_cell, inputs=input_x, dtype=tf.float32)
+
+        # 注意这里输出需要转置  转换为时序优先的
+        hiddens = tf.transpose(hiddens, [1, 0, 2])
+        return hiddens, states
 
 
     def cnn_multiple_layers(self):
@@ -211,12 +241,19 @@ class TextRNN(object):
 
     def train_old(self):
         """based on the loss, use SGD to update parameter"""
+        self.global_step = tf.Variable(0, trainable=False, name="global_step")
+        self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
+        self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps, self.decay_rate, staircase=True)
         train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step, learning_rate=learning_rate, optimizer="Adam", clip_gradients=self.clip_gradients)
         return train_op
 
     def train(self):
         """based on the loss, use SGD to update parameter"""
+        self.global_step = tf.Variable(0, trainable=False, name="global_step")
+        self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
+        self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
+
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps, self.decay_rate, staircase=True)
         self.learning_rate_= learning_rate
         optimizer = tf.train.AdamOptimizer(learning_rate)
