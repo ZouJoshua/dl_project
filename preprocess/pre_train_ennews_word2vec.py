@@ -151,8 +151,8 @@ def get_embed_from_embedfile(file):
     _doc_count = 0
     for doc in read_txt_file(file):
         _doc_count += 1
-        word_list = split_text(doc)
-        doc_word_list.append(word_list)
+        # word_list = split_text(doc)
+        doc_word_list.append(doc)
     print("<<<<< 已读取{}文档".format(_doc_count))
 
     return doc_word_list
@@ -199,7 +199,7 @@ def main():
     # random.shuffle(doc_word_list_all)
     print(">>>>> 开始训练词向量")
     s = time.time()
-    # train_word2vec_embed_by_gensim(doc_word_list_all, corpus_data_path)
+    train_word2vec_embed_by_gensim(doc_word_list_all, corpus_data_path)
     e = time.time()
     print(">>>>> 训练{}篇文档词向量耗时{}".format(len(doc_word_list_all), e-s))
 
