@@ -151,11 +151,10 @@ def get_embed_from_embedfile(file):
     _doc_count = 0
     for doc in read_txt_file(file):
         _doc_count += 1
-        # word_list = split_text(doc)
-        doc_word_list.append(doc)
+        word_list = split_text(doc)
+        # doc_word_list.append(doc)
+        yield word_list
     print("<<<<< 已读取{}文档".format(_doc_count))
-
-    return doc_word_list
 
 
 
