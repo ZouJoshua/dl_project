@@ -14,32 +14,34 @@ from tensorflow.contrib import rnn
 
 class TextRNN(object):
     def __init__(self,
-                 filter_sizes,
-                 num_filters,
+                 sentence_len,
                  label_size,
+                 batch_size,
+                 hidden_dim,
                  learning_rate,
                  learning_decay_rate,
                  learning_decay_steps,
-                 batch_size,
-                 sentence_len,
                  vocab_size,
                  embed_size,
                  is_training,
                  clip_gradients=5.0):
+        self.sentence_len = sentence_len
         self.label_size = label_size
         self.batch_size = batch_size
-        self.sentence_len = sentence_len
+
         self.vocab_size = vocab_size
         self.embed_size = embed_size
+        self.hidden_dim = hidden_dim
+        self.is_training = is_training
+        self.learning_rate = learning_rate
+        self.num_sampled = 20
+
         self.is_training_flag = is_training
         self.learning_rate = learning_rate
         self.decay_rate = learning_decay_rate
         self.decay_steps = learning_decay_steps
+        self.gate = "lstm"
 
-        self.filter_sizes = filter_sizes  # it is a list of int. e.g. [3,4,5]
-        self.num_filters = num_filters
-
-        self.num_filters_total = self.num_filters * len(filter_sizes)  # how many filters totally.
         self.clip_gradients = clip_gradients
 
         self.build_graph()
@@ -56,167 +58,132 @@ class TextRNN(object):
         self.initializer = tf.random_normal_initializer(stddev=0.1)
         with tf.name_scope("embedding_layer"):
             self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
-        self.w = tf.get_variable("w", shape=[self.num_filters_total, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
+        self.w = tf.get_variable("w", shape=[self.hidden_dim, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
         self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
 
     def inference(self):
         """
         embedding layers
-        convolutional layer
-        max-pooling
-        softmax layer"""
+        single_hidden_layer
+        """
         self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)  # [None,sencente_len,embed_size]
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
-        # if self.use_mulitple_layer_cnn: # this may take 50G memory.
-        #    print("use multiple layer CNN")
-        #    h=self.cnn_multiple_layers()
-        # else: # this take small memory, less than 2G memory
-        print("use single layer CNN")
-        h = self.cnn_single_layer()
+        print("use single layer RNN")
+        h = self.rnn_single_layer(static=True)
         # 5. logits(use linear layer)and predictions(argmax)
         with tf.variable_scope('fully_connection_layer'):
             logits = tf.matmul(h, self.w) + self.b  # shape:[None, self.num_classes]==tf.matmul([None,self.embed_size],[self.embed_size,self.num_classes])
         return logits
 
-    def single_layer_static_lstm(self, input_x, n_steps, n_hidden):
-        '''
-        返回静态单层LSTM单元的输出，以及cell状态
+    def hidden_layer(self, hidden_dim, dropout_layer=False, multi_layer=1):
+        if self.gate == 'lstm':
+            hidden_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
+        elif self.gate == 'gru':
+            hidden_cell = tf.contrib.rnn.GRUCell(num_units=hidden_dim)
+        else:
+            hidden_cell = tf.contrib.rnn.BasicRNNCell(num_units=hidden_dim)
 
-        args:
-            input_x:输入张量 形状为[batch_size,n_steps,n_input]
-            n_steps:时序总数
-            n_hidden：LSTM单元输出的节点个数 即隐藏层节点数
-        '''
+        if dropout_layer:
+            dropout_cell = rnn.DropoutWrapper(hidden_cell, output_keep_prob=self.dropout_keep_prob)
+        else:
+            dropout_cell = hidden_cell
 
-        # 把输入input_x按列拆分，并返回一个有n_steps个张量组成的list 如batch_sizex28x28的输入拆成[(batch_size,28),((batch_size,28))....]
-        # 如果是调用的是静态rnn函数，需要这一步处理   即相当于把序列作为第一维度
-        input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+        if multi_layer > 1:
+            cells = [dropout_cell for _ in range(multi_layer)]
+            rnn_cell = tf.contrib.rnn.MultiRNNCell(cells, state_is_tuple=True)
+        else:
+            rnn_cell = dropout_cell
 
-        # 可以看做隐藏层
-        lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden, forget_bias=1.0)
-        # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
-        hiddens, states = tf.contrib.rnn.static_rnn(cell=lstm_cell, inputs=input_x1, dtype=tf.float32)
+        return rnn_cell
 
-        return hiddens, states
+    def hidden_bi_lstm_layer(self, hidden_dim, dropout_layer=False, multi_layer=1):
 
-    def single_layer_static_gru(self, input_x, n_steps, n_hidden):
-        '''
-        返回静态单层GRU单元的输出，以及cell状态
+        fw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
+        bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
 
-        args:
-            input_x:输入张量 形状为[batch_size,n_steps,n_input]
-            n_steps:时序总数
-            n_hidden：gru单元输出的节点个数 即隐藏层节点数
-        '''
+        if dropout_layer:
+            fw_dropout_cell = rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
+            bw_dropout_cell = rnn.DropoutWrapper(bw_cell, output_keep_prob=self.dropout_keep_prob)
+        else:
+            fw_dropout_cell = fw_cell
+            bw_dropout_cell = bw_cell
 
-        # 把输入input_x按列拆分，并返回一个有n_steps个张量组成的list 如batch_sizex28x28的输入拆成[(batch_size,28),((batch_size,28))....]
-        # 如果是调用的是静态rnn函数，需要这一步处理   即相当于把序列作为第一维度
-        input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+        if multi_layer != 1:
+            fw_rnn_cell = [fw_dropout_cell for _ in range(multi_layer)]
+            bw_rnn_cell = [bw_dropout_cell for _ in range(multi_layer)]
+        else:
+            fw_rnn_cell = fw_dropout_cell
+            bw_rnn_cell = bw_dropout_cell
 
-        # 可以看做隐藏层
-        gru_cell = tf.contrib.rnn.GRUCell(num_units=n_hidden)
-        # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
-        hiddens, states = tf.contrib.rnn.static_rnn(cell=gru_cell, inputs=input_x1, dtype=tf.float32)
-
-        return hiddens, states
-
-    def single_layer_dynamic_lstm(self, input_x, n_steps, n_hidden):
-        '''
-        返回动态单层LSTM单元的输出，以及cell状态
-
-        args:
-            input_x:输入张量  形状为[batch_size,n_steps,n_input]
-            n_steps:时序总数
-            n_hidden：LSTM单元输出的节点个数 即隐藏层节点数
-        '''
-        # 可以看做隐藏层
-        lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=n_hidden, forget_bias=1.0)
-        # 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出也是这种形状
-        hiddens, states = tf.nn.dynamic_rnn(cell=lstm_cell, inputs=input_x, dtype=tf.float32)
-
-        # 注意这里输出需要转置  转换为时序优先的
-        hiddens = tf.transpose(hiddens, [1, 0, 2])
-        return hiddens, states
-
-    def single_layer_dynamic_gru(self, input_x, n_steps, n_hidden):
-        '''
-        返回动态单层GRU单元的输出，以及cell状态
-
-        args:
-            input_x:输入张量 形状为[batch_size,n_steps,n_input]
-            n_steps:时序总数
-            n_hidden：gru单元输出的节点个数 即隐藏层节点数
-        '''
-
-        # 可以看做隐藏层
-        gru_cell = tf.contrib.rnn.GRUCell(num_units=n_hidden)
-        # 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出也是这种形状
-        hiddens, states = tf.nn.dynamic_rnn(cell=gru_cell, inputs=input_x, dtype=tf.float32)
-
-        # 注意这里输出需要转置  转换为时序优先的
-        hiddens = tf.transpose(hiddens, [1, 0, 2])
-        return hiddens, states
+        return fw_rnn_cell, bw_rnn_cell
 
 
-    def cnn_multiple_layers(self):
-        # loop each filter size
-        # for each filter, do: convolution-pooling layer, feature shape is 4-d. Feature is a new variable
-        # step1.create filters
-        # step2.conv (CNN->BN->relu)
-        # step3.apply nolinearity(tf.nn.relu)
-        # step4.max-pooling(tf.nn.max_pool)
-        # step5.dropout
-        pooled_outputs = []
-        print("sentence_embeddings_expanded:", self.sentence_embeddings_expanded)
-        for i, filter_size in enumerate(self.filter_sizes):
-            with tf.variable_scope('cnn_multiple_layers' + "convolution-pooling-%s" % filter_size):
-                # Layer1:CONV-RELU
-                # 1) CNN->BN->relu
-                filter = tf.get_variable("filter-%s" % filter_size, [filter_size, self.embed_size, 1, self.num_filters], initializer=self.initializer)
-                conv = tf.nn.conv2d(self.sentence_embeddings_expanded, filter, strides=[1, 1, 1, 1], padding="SAME", name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
-                conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training_flag, scope='cnn1')
-                print(i, "conv1:", conv)
-                b = tf.get_variable("b-%s" % filter_size, [self.num_filters])
-                h = tf.nn.relu(tf.nn.bias_add(conv, b), "relu")  # shape:[batch_size,sequence_length,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
+    def rnn_single_layer(self, input_x, n_steps, n_hidden, static=True):
+        """
+        单层rnn单向网络
+        :param input_x:
+        :param n_steps:
+        :param n_hidden:
+        :param static:
+        :return:
+        """
 
-                # 2) CNN->BN->relu
-                h = tf.reshape(h, [-1, self.sentence_len, self.num_filters, 1])  # shape:[batch_size,sequence_length,num_filters,1]
-                # Layer2:CONV-RELU
-                filter2 = tf.get_variable("filter2-%s" % filter_size, [filter_size, self.num_filters, 1, self.num_filters], initializer=self.initializer)
-                conv2 = tf.nn.conv2d(h, filter2, strides=[1, 1, 1, 1], padding="SAME", name="conv2")  # shape:[batch_size,sequence_length-filter_size*2+2,1,num_filters]
-                conv2 = tf.contrib.layers.batch_norm(conv2, is_training=self.is_training_flag, scope='cnn2')
-                print(i, "conv2:", conv2)
-                b2 = tf.get_variable("b2-%s" % filter_size, [self.num_filters])
-                h = tf.nn.relu(tf.nn.bias_add(conv2, b2), "relu2")  # shape:[batch_size,sequence_length,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
+        if static:
+            input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+            rnn_cell = self.hidden_layer(n_hidden, dropout_layer=False, multi_layer=1)
 
-                # 3. Max-pooling
-                pooling_max = tf.squeeze(tf.nn.max_pool(h, ksize=[1, self.sentence_len, 1, 1],strides=[1, 1, 1, 1], padding='VALID', name="pool"))
-                # pooling_avg=tf.squeeze(tf.reduce_mean(h,axis=1)) #[batch_size,num_filters]
-                print(i, "pooling:", pooling_max)
-                # pooling=tf.concat([pooling_max,pooling_avg],axis=1) #[batch_size,num_filters*2]
-                pooled_outputs.append(pooling_max)  # h:[batch_size,sequence_length,1,num_filters]
-        # concat
-        h = tf.concat(pooled_outputs, axis=1)  # [batch_size,num_filters*len(self.filter_sizes)]
-        print("h.concat:", h)
+            # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+            hiddens, states = tf.contrib.rnn.static_rnn(cell=rnn_cell, inputs=input_x1, dtype=tf.float32)
+        else:
+            rnn_cell = self.hidden_layer(n_hidden, dropout_layer=False, multi_layer=1)
+            # 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出也是这种形状
+            hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
+            # 注意这里输出需要转置  转换为时序优先的
+            hiddens = tf.transpose(hiddens, [1, 0, 2])
+        # 取LSTM最后一个时序的输出，然后经过全连接网络得到输出值
+        output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
+                                                   activation_fn=tf.nn.softmax)
+        # 全连接层
+        fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
+        fc = tf.nn.relu(fc)
 
-        with tf.name_scope("dropout"):
-            h = tf.nn.dropout(h, keep_prob=self.dropout_keep_prob)  # [batch_size,sequence_len - filter_size + 1,num_filters]
-        return h  # [batch_size,sequence_len - filter_size + 1,num_filters]
+        return fc
 
-    # def loss_multilabel(self, l2_lambda=0.0001):  # 0.0001
-    #     with tf.name_scope("loss"):
-    #         # let `x = logits`, `z = labels`.
-    #         # The logistic loss is:z * -log(sigmoid(x)) + (1 - z) * -log(1 - sigmoid(x))
-    #         losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=self.input_y_multilabel, logits=self.logits)
-    #         #losses=tf.nn.softmax_cross_entropy_with_logits(labels=self.input__y,logits=self.logits)
-    #         #losses=-self.input_y_multilabel*tf.log(self.logits)-(1-self.input_y_multilabel)*tf.log(1-self.logits)
-    #         print("sigmoid_cross_entropy_with_logits.losses:", losses)
-    #         losses = tf.reduce_sum(losses, axis=1)  # shape=(?,). loss for all data in the batch
-    #         loss = tf.reduce_mean(losses)         # shape=().   average loss in the batch
-    #         l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-    #         loss = loss+l2_losses
-    #     return loss
+    def rnn_multi_layer(self, input_x, n_steps, n_hidden, static=True):
+        if static:
+            input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+            rnn_cell = self.hidden_layer(n_hidden, dropout_layer=False, multi_layer=2)
+
+            # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+            hiddens, states = tf.contrib.rnn.static_rnn(cell=rnn_cell, inputs=input_x1, dtype=tf.float32)
+        else:
+            rnn_cell = self.hidden_layer(n_hidden, dropout_layer=False, multi_layer=2)
+            hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
+            hiddens = tf.transpose(hiddens, [1, 0, 2])
+        output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
+                                                activation_fn=tf.nn.softmax)
+        # 全连接层
+        fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
+        fc = tf.nn.relu(fc)
+
+        return fc
+
+    def rnn_single_bi_layer(self, input_x, n_steps, n_hidden, static=True):
+        if static:
+            input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+            fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=False, multi_layer=1)
+            hiddens, fw_state, bw_state = tf.contrib.rnn.static_bidirectional_rnn(cell_fw=fw_rnn_cell,
+                                                                                  cell_bw=bw_rnn_cell, inputs=input_x1,
+                                                                                  dtype=tf.float32)
+        else:
+            # 按axis=2合并 (?,28,128) (?,28,128)按最后一维合并(?,28,256)
+            hiddens = tf.concat(hiddens, axis=2)
+            hiddens = tf.transpose(hiddens, [1, 0, 2])
+
+
+    def rnn_multi_bi_layer(self):
+        pass
 
 
     def loss(self, l2_lambda=0.0001):  # 0.001

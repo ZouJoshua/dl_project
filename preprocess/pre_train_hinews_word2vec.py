@@ -4,7 +4,7 @@
 @Author  : Joshua
 @Time    : 19-5-15 下午6:13
 @File    : word2vec_embedding.py
-@Desc    : 
+@Desc    : 预训练印地语新闻词向量
 """
 
 
