@@ -63,8 +63,6 @@ tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epoc
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
 tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
 
-filter_sizes = [3, 4, 5]
-
 
 def next_batch(x, y, batch_size):
     """
@@ -197,7 +195,8 @@ def main(_):
         step6 ->（预测）"""
     # step1 -> load data
     ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
-    train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
+    # train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
+    train, test, _ = ds.load_data_sample(use_embedding=True, valid_portion=0.2)
     index2label = ds.index2label
     vocab_embedding = ds.embedding
     vocab_size = len(ds.word2index)
@@ -242,8 +241,9 @@ def main(_):
 
         # Instantiate Model
 
-        textcnn = TextCNN(filter_sizes, FLAGS.num_filters, FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
-                             FLAGS.batch_size, FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
+        textcnn = TextRNN(FLAGS.sentence_len, FLAGS.label_size, FLAGS.batch_size, FLAGS.num_filters,
+                          FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+                              vocab_size, FLAGS.embed_size, FLAGS.is_training)
 
         print("writing to {}\n".format(output_dir))
 

@@ -184,6 +184,58 @@ class DataSet(object):
         print("load_data ended...")
         return train, test, test
 
+    def load_data_sample(self, use_embedding=True, valid_portion=0.2):
+        """
+        划分训练集、测试集、验证集(小批量数据验证模型网络结构)
+        :param use_embedding: 提供embedding 词向量（默认提供）
+        :param valid_portion: 测试集比例（默认0.2）
+        :return: train, test, valid. where train=(trainX, trainY). where
+                        trainX: is a list of list.each list representation a sentence.trainY: is a list of label. each label is a number
+        """
+        # 1. load raw data
+        print("load_data.started...")
+        print("load_data.training_data_path:", self.raw_data_path)
+        lines = read_json_format_file(self.raw_data_path)
+        # 2.transform X as indices
+        """
+        #todo: 去掉停用词 -> 统计词频 -> 去除低频词
+        """
+        # 3.transform  y as scalar
+        X = []
+        Y = []
+        count_not_exist = 0
+        if use_embedding:
+            self.embedding = self.get_embedding(self.word2embed)
+
+        for i, line in enumerate(lines):
+            title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
+            content = line["text"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
+            x = title + " " + content
+            x = re.sub("\s+", " ", x)
+            y = str(line["taste"])
+            # 打印前几条
+            if i < 2:
+                print("x{}:".format(i), x)  # get raw x
+            x = split_text(x)
+            x = [self.word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
+            if i < 2:
+                print("x{}-word-index:".format(i), x)  # word to index
+            y = self.label2index[y]
+            if i < 1000:
+                X.append(x)
+                Y.append(y)
+            else:
+                pass
+
+
+        # 4.split to train,test and valid data(基于y标签分层)
+        doc_num = len(X)
+        print("number_doc:", doc_num)
+        train, test = self.stratified_sampling(X, Y, valid_portion)
+        print("load_data ended...")
+        return train, test, test
+
+
     def get_embedding(self, word2embed):
         vocab_size = len(word2embed)
         unk = word2embed.get("UNK", np.random.randn(self.embed_dim))

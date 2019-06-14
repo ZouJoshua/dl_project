@@ -60,7 +60,7 @@ def read_txt_file(file):
     """
     if not os.path.exists(file):
         raise FileNotFoundError("【{}】文件未找到，请检查".format(file))
-    print(">>>>> 正在读原始取数据文件：{}".format(file))
+    print(">>>>> 正在读原始数据文件：{}".format(file))
     with open(file, 'r') as f:
         while True:
             _line = f.readline()
@@ -111,7 +111,7 @@ def get_ngrams(sentence, n_gram=3):
     :return:string. example:'w17314 w17314w5521 w17314w5521w7729 w5521 w5521w7729 w5521w7729w767 w7729 w7729w767 w7729w767w10147 w767 w767w10147 w767w10147w111 w10147 w10147w111 w111'
     """
     result = list()
-    word_list = sentence.split(" ") #[sentence[i] for i in range(len(sentence))]
+    word_list = sentence.split(" ")  # [sentence[i] for i in range(len(sentence))]
     unigram = ''
     bigram = ''
     trigram = ''
@@ -120,16 +120,16 @@ def get_ngrams(sentence, n_gram=3):
     for i, word in enumerate(word_list):
         unigram = word                           # ui-gram
         word_i = unigram
-        if n_gram >= 2 and i+2 <= length_sentence: #bi-gram
+        if n_gram >= 2 and i+2 <= length_sentence:  # bi-gram
             bigram = "".join(word_list[i:i+2])
             word_i = word_i + ' ' + bigram
-        if n_gram >= 3 and i+3 <= length_sentence: #tri-gram
+        if n_gram >= 3 and i+3 <= length_sentence:  # tri-gram
             trigram = "".join(word_list[i:i+3])
             word_i = word_i + ' ' + trigram
-        if n_gram >= 4 and i+4 <= length_sentence: #four-gram
+        if n_gram >= 4 and i+4 <= length_sentence:  # four-gram
             fourgram = "".join(word_list[i:i+4])
             word_i = word_i + ' ' + fourgram
-        if n_gram >= 5 and i+5 <= length_sentence: #five-gram
+        if n_gram >= 5 and i+5 <= length_sentence:  # five-gram
             fivegram = "".join(word_list[i:i+5])
             word_i = word_i + ' ' + fivegram
         result.append(word_i)

@@ -84,6 +84,33 @@ class CleanDoc(object):
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         return text
 
+def clean_text(doc):
+    title = doc['title']
+    content = doc['content']
+    text = title + " " + content
+    text = CleanDoc(text).text
+    return text
+
+
+def get_embed_from_rawfile(file):
+    """
+    直接从原始文件生成词向量训练语料
+    :param file: 原始数据文件
+    :return:
+    """
+    print(">>>>> 正在从原始文件获取分词list语料")
+    doc_word_list = list()
+    _doc_count = 0
+    for doc in read_json_format_file(file):
+        _doc_count += 1
+        if _doc_count % 100000 == 0:
+            print(">>>>> 已处理{}篇文档".format(_doc_count))
+        clean_doc = clean_text(doc)
+        if clean_doc:
+            doc_word_list.append(clean_doc)
+        else:
+            continue
+    return doc_word_list
 
 
 def write_embed_file(corpus_data_path):
@@ -107,37 +134,7 @@ def write_embed_file(corpus_data_path):
             continue
     ef.close()
     print("<<<<< 【{}】embed文件已生成".format(embed_file))
-
-
-def get_embed_from_rawfile(file):
-    """
-    直接从原始文件生成词向量训练语料
-    :param file: 原始数据文件
-    :return:
-    """
-    print(">>>>> 正在获取分词list语料")
-    doc_word_list = list()
-    _doc_count = 0
-    for doc in read_json_format_file(file):
-        _doc_count += 1
-        if _doc_count % 100000 == 0:
-            print(">>>>> 已处理{}篇文档".format(_doc_count))
-        clean_doc = clean_text(doc)
-        if clean_doc:
-            doc_word_list.append(clean_doc)
-        else:
-            continue
-    return doc_word_list
-
-def clean_text(doc):
-    title = doc['title']
-    content = doc['content']
-    text = title + " " + content
-    text = CleanDoc(text).text
-    return text
-
-
-
+    return _doc_count
 
 
 def get_embed_from_embedfile(file):
@@ -157,10 +154,26 @@ def get_embed_from_embedfile(file):
     return doc_word_list
 
 
+class Sentences(object):
+
+    def __init__(self, filename):
+        self.file = filename
+
+    def __iter__(self):
+        print(">>>>> 正在读取embed语料")
+        _doc_count = 0
+        for doc in read_txt_file(self.file):
+            _doc_count += 1
+            word_list = split_text(doc)
+            yield word_list
+        print("<<<<< 已读取{}文档".format(_doc_count))
+
+
+
 def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="word2vec.model", word2vec_file="word2vec.bin"):
     """
     gensim训练词向量
-    :param doc_word_list:
+    :param doc_word_list: a memory-friendly iterator or list
     :param save_path:
     :param model_file:
     :param word2vec_file:
@@ -188,30 +201,34 @@ def train_word2vec_embed_by_gensim(doc_word_list, save_path=None, model_file="wo
 
 
 def main():
-    # corpus_data_path = "/data/word2vec/en_news"
-    corpus_data_path = "/home/zoushuai/tensorflow_project/preprocess"
+    corpus_data_path = "/data/word2vec/en_news"
+    # corpus_data_path = "/home/zoushuai/tensorflow_project/preprocess"
     file = os.path.join(corpus_data_path, "word_embed.txt")
+    sentences = None
     if not os.path.exists(file):
-        write_embed_file(corpus_data_path)
-    doc_word_list_all = get_embed_from_embedfile(file)
+        doc_count = write_embed_file(corpus_data_path)
+        if doc_count > 100000:
+            sentences = Sentences(file)
+        else:
+            sentences = get_embed_from_embedfile(file)
+    if not sentences:
+        sentences = Sentences(file)
     # random.shuffle(doc_word_list_all)
     print(">>>>> 开始训练词向量")
     s = time.time()
-    train_word2vec_embed_by_gensim(doc_word_list_all, corpus_data_path)
+    train_word2vec_embed_by_gensim(sentences, corpus_data_path)
     e = time.time()
-    print(">>>>> 训练{}篇文档词向量耗时{}".format(len(doc_word_list_all), e-s))
+    print(">>>>> 训练文档词向量耗时{}".format(e-s))
 
 
 def _test_read_data():
-    corpus_data_path = "/data/in_hi_news/raw_data/raw_data"
-    file = os.path.join(corpus_data_path, "part-00000-69676dc0-8d50-4410-864d-79709f3f4960-c000.json")
-    _doc_count = 0
-    for doc in read_json_format_file(file):
-        _doc_count += 1
-        if _doc_count == 10:
-            break
-        print(doc)
+    corpus_data_path = "/home/zoushuai/tensorflow_project/preprocess"
+    file = os.path.join(corpus_data_path, "word_embed.txt")
+    sentences = Sentences(file)
+    print(type(sentences))
+    print(sentences)
 
 
 if __name__ == '__main__':
     main()
+    # _test_read_data()
