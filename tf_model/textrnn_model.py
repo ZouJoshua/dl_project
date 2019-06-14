@@ -9,8 +9,6 @@
 
 import tensorflow as tf
 
-from tensorflow.contrib import rnn
-
 
 class TextRNN(object):
     def __init__(self,
@@ -93,7 +91,7 @@ class TextRNN(object):
             hidden_cell = tf.contrib.rnn.BasicRNNCell(num_units=hidden_dim)
 
         if dropout_layer:
-            dropout_cell = rnn.DropoutWrapper(hidden_cell, output_keep_prob=self.dropout_keep_prob)
+            dropout_cell = tf.contrib.rnn.DropoutWrapper(hidden_cell, output_keep_prob=self.dropout_keep_prob)
         else:
             dropout_cell = hidden_cell
 
@@ -111,8 +109,8 @@ class TextRNN(object):
         bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
 
         if dropout_layer:
-            fw_dropout_cell = rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
-            bw_dropout_cell = rnn.DropoutWrapper(bw_cell, output_keep_prob=self.dropout_keep_prob)
+            fw_dropout_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
+            bw_dropout_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=self.dropout_keep_prob)
         else:
             fw_dropout_cell = fw_cell
             bw_dropout_cell = bw_cell
