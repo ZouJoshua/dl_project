@@ -71,14 +71,14 @@ class TextRNN(object):
         self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)  # [None,sencente_len,embed_size]
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
-        print("use single layer RNN")
-        h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
+        # print("use single layer RNN")
+        # h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
         # print("use single layer bi-RNN")
         # h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
         # print("use multi layer RNN")
         # h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
-        # print("use multi layer bi-RNN")
-        # h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
+        print("use multi layer bi-RNN")
+        h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
 
         # 5. logits(use linear layer) and predictions(argmax)
         # full coneection and softmax output
@@ -164,8 +164,8 @@ class TextRNN(object):
 
         return hiddens[-1]
 
-    def rnn_multi_layer(self, input_x, n_steps, n_hidden, static=True):
-        rnn_cell = self.hidden_layer(n_hidden, dropout_layer=False, multi_layer=2)
+    def rnn_multi_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
+        rnn_cell = self.hidden_layer(n_hidden, dropout_layer=if_dropout, multi_layer=2)
 
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
@@ -174,16 +174,16 @@ class TextRNN(object):
         else:
             hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
             hiddens = tf.transpose(hiddens, [1, 0, 2])
-        # 全连接层，后面接dropout以及relu激活
-        output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
-                                                activation_fn=tf.nn.softmax)
-        fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
-        fc = tf.nn.relu(fc)
+        # # 全连接层，后面接dropout以及relu激活
+        # output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
+        #                                         activation_fn=tf.nn.softmax)
+        # fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
+        # fc = tf.nn.relu(fc)
 
-        return fc
+        return hiddens[-1]
 
-    def rnn_single_bi_layer(self, input_x, n_steps, n_hidden, static=True):
-        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=False, multi_layer=1)
+    def rnn_single_bi_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
+        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=if_dropout, multi_layer=1)
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
             input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
@@ -196,15 +196,15 @@ class TextRNN(object):
             # 按axis=2合并 (?,28,128) (?,28,128)按最后一维合并(?,28,256)
             hiddens = tf.concat(hiddens, axis=2)
             hiddens = tf.transpose(hiddens, [1, 0, 2])
-        # 全连接层，后面接dropout以及relu激活
-        output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
-                                                activation_fn=tf.nn.softmax)
-        fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
-        fc = tf.nn.relu(fc)
-        return fc
+        # # 全连接层，后面接dropout以及relu激活
+        # output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
+        #                                         activation_fn=tf.nn.softmax)
+        # fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
+        # fc = tf.nn.relu(fc)
+        return hiddens[-1]
 
-    def rnn_multi_bi_layer(self, input_x, n_steps, n_hidden, static=True):
-        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=False, multi_layer=2)
+    def rnn_multi_bi_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
+        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=if_dropout, multi_layer=2)
 
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
@@ -217,13 +217,13 @@ class TextRNN(object):
                                                                                          dtype=tf.float32)
             hiddens = tf.concat(hiddens, axis=2)
             hiddens = tf.transpose(hiddens, [1, 0, 2])
-        # 全连接层，后面接dropout以及relu激活
-        output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
-                                                   activation_fn=tf.nn.softmax)
-        fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
-        fc = tf.nn.relu(fc)
+        # # 全连接层，后面接dropout以及relu激活
+        # output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
+        #                                            activation_fn=tf.nn.softmax)
+        # fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
+        # fc = tf.nn.relu(fc)
 
-        return fc
+        return hiddens[-1]
 
 
     def loss(self, l2_lambda=0.0001):  # 0.001
