@@ -11,17 +11,21 @@ import tensorflow as tf
 
 
 class TextRNN(object):
+    """
+    Using LSTM or GRU neural network for text classification
+    """
     def __init__(self,
                  sentence_len,
                  label_size,
                  batch_size,
-                 hidden_dim,
+                 hidden_unit,
                  learning_rate,
                  learning_decay_rate,
                  learning_decay_steps,
                  vocab_size,
                  embed_size,
                  is_training,
+                 cell='lstm',
                  clip_gradients=5.0):
         self.sentence_len = sentence_len
         self.label_size = label_size
@@ -29,16 +33,15 @@ class TextRNN(object):
 
         self.vocab_size = vocab_size
         self.embed_size = embed_size
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = hidden_unit
         self.is_training = is_training
         self.learning_rate = learning_rate
-        self.num_sampled = 20
 
         self.is_training_flag = is_training
         self.learning_rate = learning_rate
         self.decay_rate = learning_decay_rate
         self.decay_steps = learning_decay_steps
-        self.gate = "lstm"
+        self.gate = cell
 
         self.clip_gradients = clip_gradients
 
@@ -63,12 +66,13 @@ class TextRNN(object):
         """
         embedding layers
         single_hidden_layer
+        fully_connection_and_softmax_layer
         """
         self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)  # [None,sencente_len,embed_size]
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
         print("use single layer RNN")
-        h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
+        h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
         # print("use single layer bi-RNN")
         # h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
         # print("use multi layer RNN")
@@ -77,8 +81,10 @@ class TextRNN(object):
         # h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
 
         # 5. logits(use linear layer) and predictions(argmax)
+        # full coneection and softmax output
         with tf.variable_scope('fully_connection_layer'):
-            # shape:[None, self.num_classes]==tf.matmul([None,self.embed_size],[self.embed_size,self.num_classes])
+            # shape:[None, self.label_size]==tf.matmul([None,self.hidden_dim],[self.hidden_dim, self.label_size])
+            # logits = tf.nn.softmax(tf.matmul(h, self.w) + self.b, name='logits')
             logits = tf.matmul(h, self.w) + self.b
         return logits
 
@@ -105,27 +111,28 @@ class TextRNN(object):
 
     def hidden_bi_lstm_layer(self, hidden_dim, dropout_layer=False, multi_layer=1):
 
-        fw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
-        bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
+        with tf.name_scope("bi-lstm"):
+            fw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
+            bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
 
-        if dropout_layer:
-            fw_dropout_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
-            bw_dropout_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=self.dropout_keep_prob)
-        else:
-            fw_dropout_cell = fw_cell
-            bw_dropout_cell = bw_cell
+            if dropout_layer:
+                fw_dropout_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
+                bw_dropout_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=self.dropout_keep_prob)
+            else:
+                fw_dropout_cell = fw_cell
+                bw_dropout_cell = bw_cell
 
-        if multi_layer != 1:
-            fw_rnn_cell = [fw_dropout_cell for _ in range(multi_layer)]
-            bw_rnn_cell = [bw_dropout_cell for _ in range(multi_layer)]
-        else:
-            fw_rnn_cell = fw_dropout_cell
-            bw_rnn_cell = bw_dropout_cell
+            if multi_layer != 1:
+                fw_rnn_cell = [fw_dropout_cell for _ in range(multi_layer)]
+                bw_rnn_cell = [bw_dropout_cell for _ in range(multi_layer)]
+            else:
+                fw_rnn_cell = fw_dropout_cell
+                bw_rnn_cell = bw_dropout_cell
 
         return fw_rnn_cell, bw_rnn_cell
 
 
-    def rnn_single_layer(self, input_x, n_steps, n_hidden, static=True):
+    def rnn_single_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
         """
         单层rnn单向网络
         :param input_x:
@@ -134,7 +141,7 @@ class TextRNN(object):
         :param static:
         :return:
         """
-        rnn_cell = self.hidden_layer(n_hidden, dropout_layer=False, multi_layer=1)
+        rnn_cell = self.hidden_layer(n_hidden, dropout_layer=if_dropout, multi_layer=1)
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
             input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
@@ -144,7 +151,7 @@ class TextRNN(object):
             hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
             # 注意这里输出需要转置  转换为时序优先的
             hiddens = tf.transpose(hiddens, [1, 0, 2])
-        a = tf.contrib.layers.fully_connected
+
         # print(type(hiddens))
         # print(hiddens[-1])
         # 全连接层，后面接dropout以及relu激活

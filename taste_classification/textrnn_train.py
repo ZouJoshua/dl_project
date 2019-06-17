@@ -32,7 +32,7 @@ data_dir = os.path.join(root_dir, "data", "en_news")
 # data_dir = "/data/zoushuai/taste_category_data"
 training_data_file = os.path.join(data_dir, "train_corpus_taste")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
-model_checkpoint = os.path.join(data_dir, "textcnn_checkpoint")
+model_checkpoint = os.path.join(data_dir, "textrnn_checkpoint")
 model_saved = os.path.join(data_dir, "pb_model")
 cache_file_h5py = os.path.join(data_dir, "data.h5")
 cache_file_pickle = os.path.join(data_dir, "vocab_label.pik")
@@ -47,7 +47,7 @@ tf.flags.DEFINE_string("cache_file_h5py", cache_file_h5py, "path of training/val
 tf.flags.DEFINE_string("cache_file_pickle", cache_file_pickle, "path of vocabulary and label files")
 
 tf.flags.DEFINE_integer("label_size", 4, "number of label")
-tf.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
+tf.flags.DEFINE_float("learning_rate", 0.05, "learning rate")
 tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")  # 批处理的大小 32-->128
 tf.flags.DEFINE_integer("decay_steps", 10000, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 一次衰减多少
