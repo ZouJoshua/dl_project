@@ -78,7 +78,7 @@ class TextRNN(object):
         # print("use multi layer RNN")
         # h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
         print("use multi layer bi-RNN")
-        h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
+        h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=False, static=False)
 
         # 5. logits(use linear layer) and predictions(argmax)
         # full coneection and softmax output
