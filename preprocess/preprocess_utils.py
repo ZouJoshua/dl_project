@@ -11,6 +11,8 @@
 import json
 import os
 from pyquery import PyQuery
+import re
+
 
 def read_json_format_file(file):
     """
