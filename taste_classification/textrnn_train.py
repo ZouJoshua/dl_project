@@ -133,7 +133,7 @@ def do_eval(sess, textcnn, eval_x, eval_y, summary_op, eval_summary_writer, inde
     number_examples = len(eval_x)
     print("number_examples for validation:", number_examples)
     eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
-    batch_size = 10
+    batch_size = 4096
 
     for batch_eval in next_batch(eval_x, eval_y, batch_size):
         curr_eval_loss, logits, step, real_labels, pred_labels, summary = sess.run(

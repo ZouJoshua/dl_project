@@ -166,11 +166,11 @@ class DataSet(object):
             x = CleanDoc(x).text
             y = str(line["taste"])
             # 打印前几条
-            if i < 2:
+            if i < 1:
                 print("x{}:".format(i), x)  # get raw x
             x = split_text(x)
             x = [self.word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
-            if i < 2:
+            if i < 1:
                 print("x{}-word-index:".format(i), x)  # word to index
             y = self.label2index[y]
             X.append(x)
@@ -214,11 +214,11 @@ class DataSet(object):
             x = CleanDoc(x).text
             y = str(line["taste"])
             # 打印前几条
-            if i < 2:
-                print("x{}:".format(i), x)  # get raw x
+            # if i < 1:
+            #     print("x{}:".format(i), x)  # get raw x
             x = split_text(x)
             x = [self.word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
-            if i < 2:
+            if i < 1:
                 print("x{}-word-index:".format(i), x)  # word to index
             y = self.label2index[y]
             if i < 1000:
