@@ -135,3 +135,61 @@ def get_ngrams(sentence, n_gram=3):
         result.append(word_i)
     result = " ".join(result)
     return result
+
+
+class CleanDoc(object):
+
+    def __init__(self, text):
+        self.text = self.clean_text(text)
+
+    def clean_text(self, text):
+        """
+        清洗流程
+        step1 -> 替换掉换行符、制表符等
+        step2 -> 转小写
+        step3 -> 清洗网址
+        step4 -> 清洗邮箱
+        step5 -> 清洗表情等非英文字符
+        step6 -> 清洗标点符号、数字
+        step7 -> 替换多个空格为一个空格
+        :param text: 原始文本
+        :return: 清洗后的文本
+        """
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        _text = text.lower()
+        no_html = self._clean_html(_text)
+        no_mail = self._clean_mail(no_html)
+        no_emoji = self._remove_emoji(no_mail)
+        no_symbol = self._remove_symbol(no_emoji)
+        text = re.sub(r"\s+", " ", no_symbol)
+        return text
+
+    def _remove_emoji(self, text):
+        cleaned_text = ""
+        for c in text:
+            if (ord(c) >= 65 and ord(c) <= 126) or (ord(c) >= 32 and ord(c) <= 63):
+                cleaned_text += c
+        return cleaned_text
+
+    def _clean_html(self, text):
+        # 去除网址
+        pattern = re.compile(r'(?:https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]')
+        # pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-zA-Z][0-9a-zA-Z]))+')
+        url_list = re.findall(pattern, text)
+        for url in url_list:
+            text = text.replace(url, " ")
+        return text.replace("( )", " ")
+
+    def _clean_mail(self, text):
+        # 去除邮箱
+        pattern = re.compile(r"\w+[-_.]*[a-zA-Z0-9]+@[a-zA-Z0-9]+\.[a-zA-Z]{2,3}")
+        mail_list = re.findall(pattern, text)
+        for mail in mail_list:
+            text = text.replace(mail, " ")
+        return text
+
+    def _remove_symbol(self, text):
+        del_symbol = string.punctuation + string.digits  # ASCII 标点符号，数字
+        remove_punctuation_map = dict((ord(char), None) for char in del_symbol)
+        text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
+        return text

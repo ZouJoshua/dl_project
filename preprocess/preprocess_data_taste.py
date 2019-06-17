@@ -21,7 +21,7 @@ import h5py
 from sklearn.model_selection import StratifiedKFold
 from gensim.models import KeyedVectors
 from preprocess.preprocess_utils import read_json_format_file, split_text
-
+from preprocess.preprocess_utils import CleanDoc
 
 class DataSet(object):
 
@@ -160,10 +160,10 @@ class DataSet(object):
             self.embedding = self.get_embedding(self.word2embed)
 
         for i, line in enumerate(lines):
-            title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
-            content = line["text"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
+            title = line["title"].strip()
+            content = line["text"].strip()
             x = title + " " + content
-            x = re.sub("\s+", " ", x)
+            x = CleanDoc(x).text
             y = str(line["taste"])
             # 打印前几条
             if i < 2:
@@ -208,10 +208,10 @@ class DataSet(object):
             self.embedding = self.get_embedding(self.word2embed)
 
         for i, line in enumerate(lines):
-            title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
-            content = line["text"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
+            title = line["title"].strip()
+            content = line["text"].strip()
             x = title + " " + content
-            x = re.sub("\s+", " ", x)
+            x = CleanDoc(x).text
             y = str(line["taste"])
             # 打印前几条
             if i < 2:
