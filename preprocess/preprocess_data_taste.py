@@ -127,7 +127,7 @@ class DataSet(object):
                     countt += count_value
                 _label2idx[label] = i
                 _idx2label[i] = label
-            print("count top10:", countt)
+            print("count top10 labels:", countt)
 
             # 如果不存在写到缓存文件中
             if not os.path.exists(cache_path):
@@ -360,8 +360,8 @@ class SplitData(object):
         o_file = open(self.out, 'w')
         category_count = dict()
         for line in self.shuff_data():
-            # taste = str(line['taste'])
-            taste = str(line['emotion'])
+            taste = str(line['taste'])
+            # taste = str(line['emotion'])
             if taste in category_count.keys():
                 # if category_count[taste] < 65000:
                 if category_count[taste] < 45000:
@@ -383,10 +383,9 @@ if __name__ == '__main__':
     data_dir = os.path.join(root_dir, "data", "en_news")
     raw_data = os.path.join(data_dir, "raw_data")
     # training_data_file = os.path.join(data_dir, "train_corpus")
-    training_data_file = os.path.join(data_dir, "train_corpus_emotion")
-    # training_data_file = os.path.join(data_dir, "train_corpus_taste")
+    # training_data_file = os.path.join(data_dir, "train_corpus_emotion")
+    training_data_file = os.path.join(data_dir, "train_corpus_taste_new")
     if not os.path.exists(training_data_file):
-        print("xxx")
         SplitData(raw_data, training_data_file)
 
     # word2vec_file = os.path.join(data_dir, "word2vec.bin")

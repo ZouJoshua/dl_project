@@ -144,8 +144,9 @@ class TextRNN(object):
             hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
             # 注意这里输出需要转置  转换为时序优先的
             hiddens = tf.transpose(hiddens, [1, 0, 2])
-        print(type(hiddens))
-        print(hiddens[-1])
+        a = tf.contrib.layers.fully_connected
+        # print(type(hiddens))
+        # print(hiddens[-1])
         # 全连接层，后面接dropout以及relu激活
         # output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
         #                                            activation_fn=tf.nn.softmax)

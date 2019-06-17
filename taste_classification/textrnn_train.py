@@ -60,7 +60,7 @@ tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/infer
 tf.flags.DEFINE_integer("num_epochs", 2, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
-tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
+tf.flags.DEFINE_integer("num_filters", 64, "number of filters")
 
 
 def next_batch(x, y, batch_size):
