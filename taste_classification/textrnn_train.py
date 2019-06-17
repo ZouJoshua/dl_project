@@ -57,7 +57,7 @@ tf.flags.DEFINE_string("ckpt_dir", model_checkpoint, "checkpoint location for th
 tf.flags.DEFINE_integer("sentence_len", 400, "max sentence length")
 tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
 tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
-tf.flags.DEFINE_integer("num_epochs", 2, "epoch times")
+tf.flags.DEFINE_integer("num_epochs", 12, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
 tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
