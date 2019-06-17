@@ -25,9 +25,7 @@ warnings.filterwarnings('ignore')
 from tf_model.textrnn_model import TextRNN
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
-from gensim.models import KeyedVectors
 from preprocess.preprocess_data_taste import DataSet
-from preprocess.preprocess_utils import CleanDoc
 
 
 data_dir = os.path.join(root_dir, "data", "en_news")
