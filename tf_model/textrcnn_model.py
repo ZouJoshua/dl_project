@@ -59,7 +59,7 @@ class TextRCNN(object):
         self.initializer = tf.random_normal_initializer(stddev=0.1)
         with tf.name_scope("embedding_layer"):
             self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
-        self.w = tf.get_variable("w", shape=[self.hidden_dim*2, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
+        self.w = tf.get_variable("w", shape=[self.hidden_dim, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
         self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
 
     def inference(self):
