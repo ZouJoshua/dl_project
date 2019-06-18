@@ -71,10 +71,10 @@ class TextRNN(object):
         self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)  # [None,sencente_len,embed_size]
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
-        print("use single layer RNN")
-        h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
-        # print("use single layer bi-RNN")
-        # h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
+        # print("use single layer RNN")
+        # h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
+        print("use single layer bi-RNN")
+        h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
         # print("use multi layer RNN")
         # h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, static=True)
         # print("use multi layer bi-RNN")

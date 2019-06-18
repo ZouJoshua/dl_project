@@ -253,7 +253,7 @@ def main(_):
         eval_summary_writer = tf.summary.FileWriter(eval_summary_dir, sess.graph)
 
         # Initialize Save
-        saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
+        saver = tf.train.Saver(tf.global_variables(), max_to_keep=3)
 
 
         if os.path.exists(FLAGS.ckpt_dir):
