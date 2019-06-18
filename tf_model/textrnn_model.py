@@ -59,7 +59,7 @@ class TextRNN(object):
         self.initializer = tf.random_normal_initializer(stddev=0.1)
         with tf.name_scope("embedding_layer"):
             self.embedding = tf.get_variable("embedding", shape=[self.vocab_size, self.embed_size], initializer=self.initializer)  # [vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
-        self.w = tf.get_variable("w", shape=[self.hidden_dim, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
+        self.w = tf.get_variable("w", shape=[self.hidden_dim*2, self.label_size], initializer=self.initializer)  # [embed_size,label_size], w是随机初始化来的
         self.b = tf.get_variable("b", shape=[self.label_size])       # [label_size]
 
     def inference(self):
@@ -172,37 +172,9 @@ class TextRNN(object):
 
         return hiddens[-1]
 
-    def rnn_multi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=2, if_dropout=False, static=True):
-        """
-        多层单向rnn网络
-        :param input_x: 输入数据
-        :param n_steps: 时序
-        :param n_hidden_unit: 隐藏层神经元个数
-        :param n_hidden_layer: 隐藏层层数
-        :param if_dropout: 是否用dropout
-        :param static: 是否用动态计算
-        :return:
-        """
-        rnn_cell = self.hidden_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
-
-        if static:
-            # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
-            input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
-            hiddens, states = tf.contrib.rnn.static_rnn(cell=rnn_cell, inputs=input_x1, dtype=tf.float32)
-        else:
-            hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
-            hiddens = tf.transpose(hiddens, [1, 0, 2])
-        # # 全连接层，后面接dropout以及relu激活
-        # output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
-        #                                         activation_fn=tf.nn.softmax)
-        # fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
-        # fc = tf.nn.relu(fc)
-
-        return hiddens[-1]
-
     def rnn_single_bi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=1, if_dropout=False, static=True):
         """
-        单层双向rnn网络
+        单层双向rnn网络（默认bi-lstm）
         :param input_x: 输入数据
         :param n_steps: 时序
         :param n_hidden_unit: 隐藏层神经元个数
@@ -229,6 +201,34 @@ class TextRNN(object):
         #                                         activation_fn=tf.nn.softmax)
         # fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
         # fc = tf.nn.relu(fc)
+        return hiddens[-1]
+
+    def rnn_multi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=2, if_dropout=False, static=True):
+        """
+        多层单向rnn网络
+        :param input_x: 输入数据
+        :param n_steps: 时序
+        :param n_hidden_unit: 隐藏层神经元个数
+        :param n_hidden_layer: 隐藏层层数
+        :param if_dropout: 是否用dropout
+        :param static: 是否用动态计算
+        :return:
+        """
+        rnn_cell = self.hidden_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
+
+        if static:
+            # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+            input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
+            hiddens, states = tf.contrib.rnn.static_rnn(cell=rnn_cell, inputs=input_x1, dtype=tf.float32)
+        else:
+            hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=input_x, dtype=tf.float32)
+            hiddens = tf.transpose(hiddens, [1, 0, 2])
+        # # 全连接层，后面接dropout以及relu激活
+        # output = tf.contrib.layers.fully_connected(inputs=hiddens[-1], num_outputs=self.label_size,
+        #                                         activation_fn=tf.nn.softmax)
+        # fc = tf.contrib.layers.dropout(output, self.dropout_keep_prob)
+        # fc = tf.nn.relu(fc)
+
         return hiddens[-1]
 
     def rnn_multi_bi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=2, if_dropout=False, static=True):
