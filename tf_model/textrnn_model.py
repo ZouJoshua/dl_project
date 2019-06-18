@@ -72,13 +72,13 @@ class TextRNN(object):
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
         # print("use single layer RNN")
-        # h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=True, static=False)
-        # print("use single layer bi-RNN")
-        # h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=False, static=False)
-        print("use multi layer RNN")
-        h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, n_hidden_layer=2, if_dropout=False, static=False)
+        # h = self.rnn_single_layer(self.embedded_words, self.sentence_len, self.hidden_dim, n_hidden_layer=1, if_dropout=True, static=False)
+        print("use single layer bi-RNN")
+        h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, n_hidden_layer=1, if_dropout=False, static=False)
+        # print("use multi layer RNN")
+        # h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, n_hidden_layer=2, if_dropout=False, static=False)
         # print("use multi layer bi-RNN")
-        # h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=False, static=False)
+        # h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, n_hidden_layer=2, if_dropout=False, static=False)
 
         # 5. logits(use linear layer) and predictions(argmax)
         # full coneection and softmax output
@@ -117,36 +117,39 @@ class TextRNN(object):
     def hidden_bi_lstm_layer(self, hidden_unit, dropout_layer=False, multi_layer=1):
 
         with tf.name_scope("bi-lstm"):
-            fw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_unit, forget_bias=1.0)
-            bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_unit, forget_bias=1.0)
 
-            if dropout_layer:
-                fw_dropout_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
-                bw_dropout_cell = tf.contrib.rnn.DropoutWrapper(bw_cell, output_keep_prob=self.dropout_keep_prob)
+            if multi_layer > 1:
+                fw_rnn_cell = list()
+                bw_rnn_cell = list()
+                for i in range(multi_layer):
+                    if dropout_layer:
+                        fw_rnn_cell.append(self.dropout_cell(self.get_rnn_cell(hidden_unit)))
+                    else:
+                        fw_rnn_cell.append(self.get_rnn_cell(hidden_unit))
+                for i in range(multi_layer):
+                    if dropout_layer:
+                        bw_rnn_cell.append(self.dropout_cell(self.get_rnn_cell(hidden_unit)))
+                    else:
+                        bw_rnn_cell.append(self.get_rnn_cell(hidden_unit))
             else:
-                fw_dropout_cell = fw_cell
-                bw_dropout_cell = bw_cell
-
-            if multi_layer != 1:
-                fw_rnn_cell = [fw_dropout_cell for _ in range(multi_layer)]
-                bw_rnn_cell = [bw_dropout_cell for _ in range(multi_layer)]
-            else:
-                fw_rnn_cell = fw_dropout_cell
-                bw_rnn_cell = bw_dropout_cell
+                fw_rnn_cell = self.get_rnn_cell(hidden_unit)
+                bw_rnn_cell = self.get_rnn_cell(hidden_unit)
 
         return fw_rnn_cell, bw_rnn_cell
 
 
-    def rnn_single_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
+    def rnn_single_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=1, if_dropout=False, static=True):
         """
-        单层rnn单向网络
-        :param input_x:
-        :param n_steps:
-        :param n_hidden:
-        :param static:
+        单层rnn网络（默认lstm）
+        :param input_x: 输入数据
+        :param n_steps: 时序
+        :param n_hidden_unit: 隐藏层神经元个数
+        :param n_hidden_layer: 隐藏层层数
+        :param if_dropout: 是否用dropout
+        :param static: 是否用动态计算
         :return:
         """
-        rnn_cell = self.hidden_layer(n_hidden, dropout_layer=if_dropout, multi_layer=1)
+        rnn_cell = self.hidden_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
             input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
@@ -170,6 +173,16 @@ class TextRNN(object):
         return hiddens[-1]
 
     def rnn_multi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=2, if_dropout=False, static=True):
+        """
+        多层单向rnn网络
+        :param input_x: 输入数据
+        :param n_steps: 时序
+        :param n_hidden_unit: 隐藏层神经元个数
+        :param n_hidden_layer: 隐藏层层数
+        :param if_dropout: 是否用dropout
+        :param static: 是否用动态计算
+        :return:
+        """
         rnn_cell = self.hidden_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
 
         if static:
@@ -187,8 +200,18 @@ class TextRNN(object):
 
         return hiddens[-1]
 
-    def rnn_single_bi_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
-        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=if_dropout, multi_layer=1)
+    def rnn_single_bi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=1, if_dropout=False, static=True):
+        """
+        单层双向rnn网络
+        :param input_x: 输入数据
+        :param n_steps: 时序
+        :param n_hidden_unit: 隐藏层神经元个数
+        :param n_hidden_layer: 隐藏层层数
+        :param if_dropout: 是否用dropout
+        :param static: 是否用动态计算
+        :return:
+        """
+        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
             input_x1 = tf.unstack(input_x, num=n_steps, axis=1)
@@ -208,8 +231,18 @@ class TextRNN(object):
         # fc = tf.nn.relu(fc)
         return hiddens[-1]
 
-    def rnn_multi_bi_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
-        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden, dropout_layer=if_dropout, multi_layer=2)
+    def rnn_multi_bi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=2, if_dropout=False, static=True):
+        """
+        多层双向rnn网络（默认bi-lstm）
+        :param input_x: 输入数据
+        :param n_steps: 时序
+        :param n_hidden_unit: 隐藏层神经元个数
+        :param n_hidden_layer: 隐藏层层数
+        :param if_dropout: 是否用dropout
+        :param static: 是否用动态计算
+        :return:
+        """
+        fw_rnn_cell, bw_rnn_cell = self.hidden_bi_lstm_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
 
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
