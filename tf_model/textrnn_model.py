@@ -76,7 +76,7 @@ class TextRNN(object):
         # print("use single layer bi-RNN")
         # h = self.rnn_single_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=False, static=False)
         print("use multi layer RNN")
-        h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=False, static=False)
+        h = self.rnn_multi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, n_hidden_layer=2, if_dropout=False, static=False)
         # print("use multi layer bi-RNN")
         # h = self.rnn_multi_bi_layer(self.embedded_words, self.sentence_len, self.hidden_dim, if_dropout=False, static=False)
 
@@ -88,32 +88,37 @@ class TextRNN(object):
             logits = tf.matmul(h, self.w) + self.b
         return logits
 
-    def hidden_layer(self, hidden_dim, dropout_layer=False, multi_layer=1):
+    def get_rnn_cell(self, hidden_unit):
         if self.gate == 'lstm':
-            hidden_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
+            return tf.contrib.rnn.BasicLSTMCell(num_units=hidden_unit, forget_bias=1.0)
         elif self.gate == 'gru':
-            hidden_cell = tf.contrib.rnn.GRUCell(num_units=hidden_dim)
+            return tf.contrib.rnn.GRUCell(num_units=hidden_unit)
         else:
-            hidden_cell = tf.contrib.rnn.BasicRNNCell(num_units=hidden_dim)
+            return tf.contrib.rnn.BasicRNNCell(num_units=hidden_unit)
 
-        if dropout_layer:
-            dropout_cell = tf.contrib.rnn.DropoutWrapper(hidden_cell, output_keep_prob=self.dropout_keep_prob)
-        else:
-            dropout_cell = hidden_cell
+    def dropout_cell(self, input_cell):
+        return tf.contrib.rnn.DropoutWrapper(input_cell, output_keep_prob=self.dropout_keep_prob)
+
+    def hidden_layer(self, hidden_unit, dropout_layer=False, multi_layer=1):
 
         if multi_layer > 1:
-            cells = [dropout_cell for _ in range(multi_layer)]
+            cells = list()
+            for i in range(multi_layer):
+                if dropout_layer:
+                    cells.append(self.dropout_cell(self.get_rnn_cell(hidden_unit)))
+                else:
+                    cells.append(self.get_rnn_cell(hidden_unit))
             rnn_cell = tf.contrib.rnn.MultiRNNCell(cells, state_is_tuple=True)
         else:
-            rnn_cell = dropout_cell
+            rnn_cell = self.get_rnn_cell(hidden_unit)
 
         return rnn_cell
 
-    def hidden_bi_lstm_layer(self, hidden_dim, dropout_layer=False, multi_layer=1):
+    def hidden_bi_lstm_layer(self, hidden_unit, dropout_layer=False, multi_layer=1):
 
         with tf.name_scope("bi-lstm"):
-            fw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
-            bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, forget_bias=1.0)
+            fw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_unit, forget_bias=1.0)
+            bw_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_unit, forget_bias=1.0)
 
             if dropout_layer:
                 fw_dropout_cell = tf.contrib.rnn.DropoutWrapper(fw_cell, output_keep_prob=self.dropout_keep_prob)
@@ -164,8 +169,8 @@ class TextRNN(object):
 
         return hiddens[-1]
 
-    def rnn_multi_layer(self, input_x, n_steps, n_hidden, if_dropout=False, static=True):
-        rnn_cell = self.hidden_layer(n_hidden, dropout_layer=if_dropout, multi_layer=2)
+    def rnn_multi_layer(self, input_x, n_steps, n_hidden_unit, n_hidden_layer=2, if_dropout=False, static=True):
+        rnn_cell = self.hidden_layer(n_hidden_unit, dropout_layer=if_dropout, multi_layer=n_hidden_layer)
 
         if static:
             # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
