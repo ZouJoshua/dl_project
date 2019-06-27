@@ -195,3 +195,22 @@ class CleanDoc(object):
         remove_punctuation_map = dict((ord(char), None) for char in del_symbol)
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         return text
+
+
+def clean_string(text):
+    # 去除网址和邮箱
+    text = text.replace("\n", " ").replace("\r", " ").replace("&#13;", " ").lower().strip()
+    url_list = re.findall(r'http://[a-zA-Z0-9.?/&=:]*', text)
+    for url in url_list:
+        text = text.replace(url, " ")
+    email_list = re.findall(r"[\w\d\.-_]+(?=\@)", text)
+    for email in email_list:
+        text = text.replace(email, " ")
+    # 去除诡异的标点符号
+    cleaned_text = ""
+    for c in text:
+        if (ord(c) >= 32 and ord(c) <= 126):
+            cleaned_text += c
+        else:
+            cleaned_text += " "
+    return cleaned_text

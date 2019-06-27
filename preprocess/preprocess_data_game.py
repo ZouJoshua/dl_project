@@ -15,6 +15,7 @@ import re
 import pickle
 import json
 import random
+import string
 import numpy as np
 
 import h5py
@@ -331,6 +332,7 @@ class SplitData2tsv(object):
 
     def __init__(self, in_file1, out_dir):
         self.f1 = in_file1
+        self.ft_file = os.path.join(out_dir, 'raw_data')
         self.train_file = os.path.join(out_dir, 'train.tsv')
         self.dev_file = os.path.join(out_dir, 'dev.tsv')
         self.test_file = os.path.join(out_dir, 'test.tsv')
@@ -351,16 +353,31 @@ class SplitData2tsv(object):
                     line = json.loads(_line.strip())
                     yield line
 
-    def get_data(self):
+    def get_data(self, ft_file):
         X = list()
         Y = list()
+        file = open(ft_file, "w")
+        _count = dict()
         for line in self.read_json_format_file(self.f1):
             if line:
-                result = self._preline(line)
+                # result = self._preline(line)
+                result = self._preline_v2(line)
                 if result:
                     x, y = result
-                    X.append(x)
-                    Y.append(y)
+                    if y in _count.keys():
+                        if _count[y] > 1000:
+                            continue
+                        else:
+                            _count[y] += 1
+                            file.write(json.dumps(line) + "\n")
+                            X.append(x)
+                            Y.append(y)
+                    else:
+                        _count[y] = 1
+                        file.write(json.dumps(line) + "\n")
+                        X.append(x)
+                        Y.append(y)
+        file.close()
         return X, Y
 
     def stratified_sampling(self, x, y, valid_portion):
@@ -413,6 +430,32 @@ class SplitData2tsv(object):
         else:
             return None
 
+    def clean_title(self, text):
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = text.lower()
+        no_emoji = CleanDoc(text)._remove_emoji(text)
+        del_symbol = string.punctuation  # ASCII 标点符号，数字
+        remove_punctuation_map = dict((ord(char), None) for char in del_symbol)
+        text = no_emoji.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
+        text = re.sub(r"\s+", " ", text)
+        return text
+
+    def _preline_v2(self, line_json):
+        # line_json = json.loads(line)
+        title = line_json["article_title"]
+        dataY = str(line_json["category"])
+        if dataY in ["700", "701", "702", "703", "704", "705", "706", "707"]:
+            # t_str = CleanDoc(title).text
+            t_str = self.clean_title(title)
+            if t_str.replace(" ", ""):
+                # dataX = title
+                dataX = t_str  # 清洗数据
+                return dataX, dataY
+            else:
+                return None
+        else:
+            return None
+
     def write_tvs_file(self, data, file):
         print(">>>>> 正在写入文件")
         with open(file, "w") as f:
@@ -420,9 +463,10 @@ class SplitData2tsv(object):
                 f.write(line + "\n")
         print("<<<<< 已写入到文件：{}".format(file))
 
+
     def get_category_corpus_file(self):
         print(">>>>> 正在处理训练语料")
-        X, Y = self.get_data()
+        X, Y = self.get_data(self.ft_file)
         train, dev = self.stratified_sampling(X, Y, 0.2)
         self.write_tvs_file(train, self.train_file)
         self.write_tvs_file(dev, self.dev_file)
