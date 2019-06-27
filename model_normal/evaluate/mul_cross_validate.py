@@ -74,7 +74,7 @@ for train_index, test_index in ss.split(iris.data):
     break
 
 # ==================================分层K折交叉验证、分层随机交叉验证==========================================
-skf = StratifiedKFold(n_splits=3)  #各个类别的比例大致和完整数据集中相同
+skf = StratifiedKFold(n_splits=3)  # 各个类别的比例大致和完整数据集中相同
 for train, test in skf.split(iris.data, iris.target):
     print("分层K折划分：%s %s" % (train.shape, test.shape))
     break

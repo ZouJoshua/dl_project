@@ -1,0 +1,47 @@
+# 下载谷歌预训练模型，解压到当前文件（2019-06-27）
+# 下载最近模型参考 https://github.com/google-research/bert/blob/master/README.md
+
+1.【BERT-Large, Uncased (Whole Word Masking)】:
+    24-layer, 1024-hidden, 16-heads, 340M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2019_05_30/wwm_uncased_L-24_H-1024_A-16.zip
+
+2.【BERT-Large, Cased (Whole Word Masking)】:
+    24-layer, 1024-hidden, 16-heads, 340M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2019_05_30/wwm_cased_L-24_H-1024_A-16.zip
+
+3.【BERT-Base, Uncased】:
+    12-layer, 768-hidden, 12-heads, 110M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2018_10_18/uncased_L-12_H-768_A-12.zip
+
+4.【BERT-Large, Uncased】:
+    24-layer, 1024-hidden, 16-heads, 340M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2018_10_18/uncased_L-24_H-1024_A-16.zip
+
+5.【BERT-Base, Cased】:
+    12-layer, 768-hidden, 12-heads , 110M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2018_10_18/cased_L-12_H-768_A-12.zip
+
+6.【BERT-Large, Cased】:
+    24-layer, 1024-hidden, 16-heads, 340M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2018_10_18/cased_L-24_H-1024_A-16.zip
+
+7.【BERT-Base, Multilingual Cased (New, recommended)】:
+    104 languages, 12-layer, 768-hidden, 12-heads, 110M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2018_11_23/multi_cased_L-12_H-768_A-12.zip
+
+8.【BERT-Base, Multilingual Uncased (Orig, not recommended) (Not recommended, use Multilingual Cased instead)】:
+    102 languages, 12-layer, 768-hidden, 12-heads, 110M parameters
+【download】:
+    https://storage.googleapis.com/bert_models/2018_11_03/multilingual_L-12_H-768_A-12.zip
+
+【BERT-Base, Chinese】:
+Chinese Simplified and Traditional, 12-layer, 768-hidden, 12-heads, 110M parameters
+【download】:
+https://storage.googleapis.com/bert_models/2018_11_03/chinese_L-12_H-768_A-12.zip
