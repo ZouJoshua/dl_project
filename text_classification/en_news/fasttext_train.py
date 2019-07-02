@@ -228,8 +228,8 @@ def main(_):
         step6 ->（预测）"""
     # step1 -> load data
     ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
-    # train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
-    train, test, _ = ds.load_data_sample(use_embedding=True, valid_portion=0.2)
+    train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
+    # train, test, _ = ds.load_data_sample(use_embedding=True, valid_portion=0.2)
     index2label = ds.index2label
     vocab_embedding = ds.embedding
     vocab_size = len(ds.word2index)
@@ -243,9 +243,8 @@ def main(_):
     print("testX.shape:", np.array(testX).shape)
     print("testY.shape:", np.array(testY).shape)
     print("testX[0]:", testX[0])  # [17, 25, 10, 406, 26, 14, 56, 61, 62, 323, 4]
-    print("testX[1]:", testX[1])
     print("testY[0]:", testY[0])  # 0
-    print("testY[1]:", testY[1])   # 0
+
 
     # Sequence padding
     print("start padding ...")
@@ -255,10 +254,8 @@ def main(_):
     # with open(FLAGS.cache_path, 'w') as data_f: #save data to cache file, so we can use it next time quickly.
     #    pickle.dump((trainX,trainY,testX,testY,vocabulary_index2word),data_f)
     ###############################################################################################
-    print("testX[0]:", testX[0])
-    print("testX[1]:", testX[1])  # [17, 25, 10, 406, 26, 14, 56, 61, 62, 323, 4]
+    print("testX[0]:", testX[0])  # [17, 25, 10, 406, 26, 14, 56, 61, 62, 323, 4]
     print("testY[0]:", testY[0])  # 0
-    print("testY[1]:", testY[1])  # 0
     print("end padding ...")
     num_examples, FLAGS.sentence_len = trainX.shape
     print("num_examples of training:", num_examples, "\nsentence_len:", FLAGS.sentence_len)

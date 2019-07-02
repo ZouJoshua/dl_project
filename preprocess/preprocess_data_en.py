@@ -210,9 +210,6 @@ class SplitData2tsv(object):
 
 
 
-
-
-
 class DataSet(object):
     """
     深度学习模型数据数据格式
@@ -341,7 +338,8 @@ class DataSet(object):
         # 1. load raw data
         print("load_data.started...")
         print("load_data.training_data_path:", self.raw_data_path)
-        lines = read_json_format_file(self.raw_data_path)
+        lines = [line for line in read_json_format_file(self.raw_data_path)]
+        random.shuffle(lines)
         # 2.transform X as indices
         """
         #todo: 去掉停用词 -> 统计词频 -> 去除低频词
@@ -455,8 +453,8 @@ class DataSet(object):
                     train_label_count[self.index2label[id]] = count
                 for id, count in test_label_id_count.items():
                     test_label_count[self.index2label[id]] = count
-                print("train_label_count: {}".format(train_label_count))
-                print("test_label_count: {}".format(test_label_count))
+                print("train_label_count: {}".format(json.dumps(train_label_count, indent=4)))
+                print("test_label_count: {}".format(json.dumps(test_label_count, indent=4)))
                 trainx = [x[i] for i in train_index]
                 trainy = [y[i] for i in train_index]
                 testx = [x[j] for j in test_index]
