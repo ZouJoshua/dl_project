@@ -354,9 +354,9 @@ class DataSet(object):
         for i, line in enumerate(lines):
             title = line["title"].strip()
             content = line["content"].strip()
-            # x = title + " " + content
-            x = self.clean_title(title)
-            # x = CleanDoc(x).text
+            x = title + " " + content
+            # x = self.clean_title(title)
+            x = CleanDoc(x).text
             y = str(line["one_level"])
             # 打印前几条
             if i < 1:
