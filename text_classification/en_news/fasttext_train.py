@@ -54,7 +54,7 @@ tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 
 tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.8, "to control the activation level of neurons")
 tf.flags.DEFINE_string("ckpt_dir", model_checkpoint, "checkpoint location for the model")
-tf.flags.DEFINE_integer("sentence_len", 300, "max sentence length")
+tf.flags.DEFINE_integer("sentence_len", 400, "max sentence length")
 tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
 tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
 tf.flags.DEFINE_integer("num_epochs", 2, "epoch times")
@@ -96,8 +96,6 @@ def batch_train(sess, fast_text, batch_x, batch_y, summary_op, train_summary_wri
 
 
 # 定义性能指标函数
-
-
 def gen_metrics(y_true, y_pred, logits):
     """
     生成acc和auc值
@@ -140,10 +138,16 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
 
 
 
-#保存为pb模型
-def export_model(session, fast_text, export_path):
 
-   #只需要修改这一段，定义输入输出，其他保持默认即可
+def export_model(session, fast_text, export_path):
+    """
+    保存为pb模型
+    :param session:
+    :param fast_text:
+    :param export_path:
+    :return:
+    """
+   # 只需要修改这一段，定义输入输出，其他保持默认即可
     prediction_signature = tf.saved_model.signature_def_utils.build_signature_def(
         inputs={"input": tf.saved_model.utils.build_tensor_info(fast_text.sentence)},
         outputs={"output": tf.saved_model.utils.build_tensor_info(fast_text.logits)},
