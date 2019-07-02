@@ -192,7 +192,7 @@ class CleanDoc(object):
 
     def _remove_symbol(self, text):
         del_symbol = string.punctuation + string.digits  # ASCII 标点符号，数字
-        remove_punctuation_map = dict((ord(char), None) for char in del_symbol)
+        remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         return text
 
