@@ -25,7 +25,7 @@ from model_tensorflow.fasttext_model import FastText
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
 from gensim.models import KeyedVectors
-from preprocess.preprocess_data_hi import DataSet
+from preprocess.preprocess_data_en import DataSet
 
 
 # data_dir = os.path.join(root_dir, "data", "hi_news")
@@ -354,7 +354,7 @@ def main(_):
 
 
 if __name__ == "__main__":
-    # tf.app.run()
+    tf.app.run()
     # print(current_work_dir)
     # print(root_dir)
-    freeze_graph("/home/zoushuai/algoproject/tf_project/data/hi_news/fasttext_checkpoint")
+    # freeze_graph("/home/zoushuai/algoproject/tf_project/data/hi_news/fasttext_checkpoint")
