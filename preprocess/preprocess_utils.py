@@ -95,7 +95,7 @@ def split_text(text, lower=True, stop=None):
     if stop:
         for i in stop:
             _text = _text.replace(i, "")
-    word_list = _text.split()
+    word_list = _text.split(" ")
     return word_list
 
 def sort_by_value(d):

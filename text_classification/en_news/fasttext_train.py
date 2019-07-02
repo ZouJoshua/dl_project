@@ -228,7 +228,8 @@ def main(_):
         step6 ->（预测）"""
     # step1 -> load data
     ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
-    train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
+    # train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
+    train, test, _ = ds.load_data_sample(use_embedding=True, valid_portion=0.2)
     index2label = ds.index2label
     vocab_embedding = ds.embedding
     vocab_size = len(ds.word2index)
