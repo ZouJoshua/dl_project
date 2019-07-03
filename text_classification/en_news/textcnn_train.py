@@ -12,7 +12,7 @@ import numpy as np
 import os
 import sys
 
-current_work_dir = os.path.realpath(__file__)
+current_work_dir = os.path.dirname(os.path.realpath(__file__))
 root_dir = os.path.dirname(os.path.dirname(current_work_dir))
 sys.path.append(root_dir)
 
