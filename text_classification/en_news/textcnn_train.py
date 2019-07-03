@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 19-3-14 下午11:27
-@File    : fasttext_train.py
+@Time    : 19-5-27 上午11:13
+@File    : textcnn_train.py
 @Desc    : 
-
 """
 
 import tensorflow as tf
@@ -13,7 +12,7 @@ import numpy as np
 import os
 import sys
 
-current_work_dir = os.path.dirname(os.path.realpath(__file__))
+current_work_dir = os.path.realpath(__file__)
 root_dir = os.path.dirname(os.path.dirname(current_work_dir))
 sys.path.append(root_dir)
 
@@ -21,18 +20,18 @@ sys.path.append(root_dir)
 import warnings
 warnings.filterwarnings('ignore')
 
-from model_tensorflow.fasttext_model import FastText
+from model_tensorflow.textcnn_model import TextCNN
 from tflearn.data_utils import pad_sequences
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 from gensim.models import KeyedVectors
 from preprocess.preprocess_data_en import DataSet
 
 
-# data_dir = os.path.join(root_dir, "data", "hi_news")
+# data_dir = os.path.join(root_dir, "data", "en_news")
 data_dir = "/data/zoushuai/news_category"
 training_data_file = os.path.join(data_dir, "train_corpus")
 word2vec_file = os.path.join(data_dir, "word2vec.bin")
-model_checkpoint = os.path.join(data_dir, "fasttext_checkpoint")
+model_checkpoint = os.path.join(data_dir, "textcnn_checkpoint")
 model_saved = os.path.join(data_dir, "pb_model")
 cache_file_h5py = os.path.join(data_dir, "data.h5")
 cache_file_pickle = os.path.join(data_dir, "vocab_label.pik")
@@ -52,14 +51,17 @@ tf.flags.DEFINE_integer("batch_size", 128, "batch size for training/evaluating")
 tf.flags.DEFINE_integer("decay_steps", 10000, "how many steps before decay learning rate")
 tf.flags.DEFINE_float("decay_rate", 0.96, "Rate of decay for learning rate")  # 一次衰减多少
 tf.flags.DEFINE_integer("num_sampled", 100, "number of noise sampling")
-tf.flags.DEFINE_float("dropout_keep_prob", 0.8, "to control the activation level of neurons")
+tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "to control the activation level of neurons")
 tf.flags.DEFINE_string("ckpt_dir", model_checkpoint, "checkpoint location for the model")
 tf.flags.DEFINE_integer("sentence_len", 400, "max sentence length")
 tf.flags.DEFINE_integer("embed_size", 300, "embedding size")
 tf.flags.DEFINE_boolean("is_training", True, "true:training, false:testing/inference")
-tf.flags.DEFINE_integer("num_epochs", 12, "epoch times")
+tf.flags.DEFINE_integer("num_epochs", 2, "epoch times")
 tf.flags.DEFINE_integer("validate_every", 1, "validate every validate_every epochs")  # 每1轮做一次验证
 tf.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not")
+tf.flags.DEFINE_integer("num_filters", 128, "number of filters")
+
+filter_sizes = [3, 4, 5]
 
 
 def next_batch(x, y, batch_size):
@@ -83,19 +85,21 @@ def next_batch(x, y, batch_size):
         yield batch_x, batch_y
 
 
-def batch_train(sess, fast_text, batch_x, batch_y, summary_op, train_summary_writer):
+def batch_train(sess, textcnn, batch_x, batch_y, keep_prob, summary_op, train_summary_writer):
     """
     训练函数
     """
     curr_loss, curr_acc, step, summary, train_op = sess.run(
-        [fast_text.loss_val, fast_text.accuracy, fast_text.global_step, summary_op, fast_text.train_op],
-        feed_dict={fast_text.sentence: batch_x, fast_text.label: batch_y})
+        [textcnn.loss_val, textcnn.accuracy, textcnn.global_step, summary_op, textcnn.train_op],
+        feed_dict={textcnn.sentence: batch_x, textcnn.label: batch_y, textcnn.dropout_keep_prob: keep_prob})
     train_summary_writer.add_summary(summary, step)
     return curr_loss, curr_acc
 
 
 
 # 定义性能指标函数
+
+
 def gen_metrics(y_true, y_pred, logits):
     """
     生成acc和auc值
@@ -109,8 +113,24 @@ def gen_metrics(y_true, y_pred, logits):
     return round(accuracy, 4), round(auc, 4), round(precision, 4), round(recall, 4), round(f1, 4)
 
 
+def report_(y_true_cls, y_pred_cls):
+    """
+    报告准确率、f1值
+    :param y_true_cls: one-hot
+    :param y_pred_cls:
+    :return:
+    """
+    categories = list()
+    print("Precision, Recall and F1-Score...")
+    result_report = classification_report(y_true_cls, y_pred_cls, target_names=categories)
+    print("Confusion Matrix...")
+    cm = confusion_matrix(y_true_cls, y_pred_cls)
+    print(cm)
+    return result_report, cm
+
+
 # 在验证集上做验证，计算损失、精确度
-def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, index2label):
+def do_eval(sess, textcnn, eval_x, eval_y, summary_op, eval_summary_writer, index2label):
     number_examples = len(eval_x)
     print("number_examples for validation:", number_examples)
     eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
@@ -118,8 +138,8 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
 
     for batch_eval in next_batch(eval_x, eval_y, batch_size):
         curr_eval_loss, logits, step, real_labels, pred_labels, summary = sess.run(
-            [fast_text.loss_val, fast_text.logits, fast_text.epoch_increment, fast_text.y_true, fast_text.y_pred, summary_op],
-            feed_dict={fast_text.sentence: batch_eval[0], fast_text.label: batch_eval[1]})
+            [textcnn.loss_val, textcnn.logits, textcnn.epoch_increment, textcnn.y_true, textcnn.y_pred, summary_op],
+            feed_dict={textcnn.sentence: batch_eval[0], textcnn.label: batch_eval[1], textcnn.dropout_keep_prob: 1.0})
         eval_summary_writer.add_summary(summary, step)
 
         acc, auc, prec, recall, f1 = gen_metrics(real_labels, pred_labels, logits)
@@ -134,23 +154,13 @@ def do_eval(sess, fast_text, eval_x, eval_y, summary_op, eval_summary_writer, in
 
 
 
-
-
-
-
-
+#保存为pb模型
 def export_model(session, fast_text, export_path):
-    """
-    保存为pb模型
-    :param session:
-    :param fast_text:
-    :param export_path:
-    :return:
-    """
-   # 只需要修改这一段，定义输入输出，其他保持默认即可
+
+   #只需要修改这一段，定义输入输出，其他保持默认即可
     prediction_signature = tf.saved_model.signature_def_utils.build_signature_def(
         inputs={"input": tf.saved_model.utils.build_tensor_info(fast_text.sentence)},
-        outputs={"output": tf.saved_model.utils.build_tensor_info(fast_text.logits)},
+        outputs={"output": tf.saved_model.utils.build_tensor_info(fast_text.label)},
         method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
 
     if os.path.exists(export_path):
@@ -175,49 +185,6 @@ def export_model(session, fast_text, export_path):
 
 
 
-def freeze_graph(model_folder):
-    """
-
-    :param model_folder:
-    :param output_graph: PB模型保存路径
-    :return:
-    """
-    if os.path.exists(model_folder):
-        ckpt = tf.train.get_checkpoint_state(model_folder)  # 检查目录下ckpt文件状态是否可用
-        input_checkpoint = ckpt.model_checkpoint_path  # 得ckpt文件路径
-        if ckpt and input_checkpoint:
-            print("存在ckpt文件：{}".format(input_checkpoint))
-    else:
-        raise FileNotFoundError("模型ckpt路径未找到，请检查")
-    output_dir = os.path.join(os.path.dirname(model_folder), "frozen_model")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    output_graph = os.path.join(output_dir, "frozen_model.pb")
-    # 指定模型输出, 这样可以允许自动裁剪无关节点(原模型输出操作节点的名字)
-    output_nodes = ["accuracy/predictions"]
-    saver = tf.train.import_meta_graph(input_checkpoint + '.meta', clear_devices=True)
-    graph = tf.get_default_graph()  # 获得默认的图
-
-    with tf.Session(graph=graph) as sess:
-        # 序列化模型
-        input_graph_def = sess.graph.as_graph_def()
-        # 载入权重
-        saver.restore(sess, input_checkpoint)
-        # 转换变量为常量
-        output_graph_def = tf.graph_util.convert_variables_to_constants(  # 模型持久化，将变量值固定
-            sess=sess,
-            input_graph_def=input_graph_def,  # 等于:sess.graph_def
-            output_node_names=output_nodes)
-
-        with tf.gfile.GFile(output_graph, "wb") as f:  # 保存模型
-            f.write(output_graph_def.SerializeToString())  # 序列化输出
-        print("%d ops in the final graph." % len(output_graph_def.node))
-
-        for op in graph.get_operations():
-            print(op.name, op.values())
-
-
-
 
 def main(_):
     """step1 -> 导入数据(从h5py缓存文件导入或重新处理数据导入)
@@ -229,7 +196,6 @@ def main(_):
     # step1 -> load data
     ds = DataSet(data_dir, word2vec_file, training_data_file, embedding_dims=FLAGS.embed_size)
     train, test, _ = ds.load_data(use_embedding=True, valid_portion=0.2)
-    # train, test, _ = ds.load_data_sample(use_embedding=True, valid_portion=0.2)
     index2label = ds.index2label
     vocab_embedding = ds.embedding
     vocab_size = len(ds.word2index)
@@ -244,7 +210,6 @@ def main(_):
     print("testY.shape:", np.array(testY).shape)
     print("testX[0]:", testX[0])  # [17, 25, 10, 406, 26, 14, 56, 61, 62, 323, 4]
     print("testY[0]:", testY[0])  # 0
-
 
     # Sequence padding
     print("start padding ...")
@@ -270,15 +235,15 @@ def main(_):
         # run_metadata = tf.RunMetadata
 
         # Instantiate Model
-        fast_text = FastText(FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
-                             FLAGS.batch_size, FLAGS.num_sampled, FLAGS.dropout_keep_prob,
-                             FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
+
+        textcnn = TextCNN(filter_sizes, FLAGS.num_filters, FLAGS.label_size, FLAGS.learning_rate, FLAGS.decay_rate, FLAGS.decay_steps,
+                             FLAGS.batch_size, FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training)
 
         print("writing to {}\n".format(output_dir))
 
         # 用summary绘制tensorBoard
-        tf.summary.scalar("loss", fast_text.loss_val)
-        tf.summary.scalar('acc', fast_text.accuracy)
+        tf.summary.scalar("loss", textcnn.loss_val)
+        tf.summary.scalar('acc', textcnn.accuracy)
         summary_op = tf.summary.merge_all()
 
         train_summary_dir = os.path.join(output_dir, "train")
@@ -287,7 +252,7 @@ def main(_):
         eval_summary_writer = tf.summary.FileWriter(eval_summary_dir, sess.graph)
 
         # Initialize Save
-        saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
+        saver = tf.train.Saver(tf.global_variables(), max_to_keep=3)
 
 
         if os.path.exists(FLAGS.ckpt_dir):
@@ -300,11 +265,11 @@ def main(_):
             sess.run(tf.global_variables_initializer())
             if FLAGS.use_embedding:  # load pre-trained word vectors
                 word_embedding = tf.constant(vocab_embedding, dtype=tf.float32)  # convert to tensor
-                t_assign_embedding = tf.assign(fast_text.embedding,
+                t_assign_embedding = tf.assign(textcnn.embedding,
                                                word_embedding)
                 sess.run(t_assign_embedding)
 
-        curr_epoch = sess.run(fast_text.epoch_step)
+        curr_epoch = sess.run(textcnn.epoch_step)
 
         # step3 -> feed data and train the model
         number_of_training_data = len(trainX)
@@ -320,7 +285,7 @@ def main(_):
                 # if epoch == 0 and counter == 0:
                 #     print("train_x[start:end]:", batch[0])
                 #     print("train_y[start:end]:", batch[1])
-                batch_loss, batch_acc = batch_train(sess, fast_text, batch[0], batch[1], summary_op, train_summary_writer)
+                batch_loss, batch_acc = batch_train(sess, textcnn, batch[0], batch[1], FLAGS.dropout_keep_prob, summary_op, train_summary_writer)
                 loss, acc, counter = loss + batch_loss, acc + batch_acc, counter + 1
 
                 if counter % 20 == 0:
@@ -333,12 +298,12 @@ def main(_):
 
             # epoch increment
             print("going to increment epoch counter....")
-            sess.run(fast_text.epoch_increment)
+            sess.run(textcnn.epoch_increment)
 
             # step4 -> validation
             print("validation epoch:{} validate_every:{}".format(epoch, FLAGS.validate_every))
             if epoch % FLAGS.validate_every == 0:
-                eval_loss, eval_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer, index2label)
+                eval_loss, eval_acc = do_eval(sess, textcnn, testX, testY, summary_op, eval_summary_writer, index2label)
                 print("epoch %d validation loss:%.3f \t validation accuracy: %.3f" % (epoch, eval_loss, eval_acc))
                 # save model to checkpoint
                 save_path = os.path.join(FLAGS.ckpt_dir, "model.ckpt")
@@ -346,17 +311,14 @@ def main(_):
                 print("saved model checkpoint to {}\n".format(path))
 
         # step5 -> 最后在测试集上测试
-        test_loss, test_acc = do_eval(sess, fast_text, testX, testY, summary_op, eval_summary_writer, index2label)
+        test_loss, test_acc = do_eval(sess, textcnn, testX, testY, summary_op, eval_summary_writer, index2label)
         print("test loss: %2.4f, test accruacy: %2.4f" % (test_loss, test_acc))
 
         # 保存模型的一种方式，保存为pb文件
-        export_model(sess, fast_text, model_saved)
+        export_model(sess, textcnn, model_saved)
 
 
 
 
 if __name__ == "__main__":
     tf.app.run()
-    # print(current_work_dir)
-    # print(root_dir)
-    # freeze_graph("/home/zoushuai/algoproject/tf_project/data/hi_news/fasttext_checkpoint")
