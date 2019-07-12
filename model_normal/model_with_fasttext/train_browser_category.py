@@ -19,11 +19,13 @@ sys.path.append(root_nlp_path)
 
 import json
 import fasttext
-from preprocess.preprocess_utils import clean_string
+from preprocess.preprocess_utils import CleanDoc
 from model_normal.evaluate.eval_calculate import evaluate_model
 from sklearn.model_selection import StratifiedKFold
 import time
 import random
+import re
+import string
 
 
 
@@ -87,20 +89,31 @@ class BrowserCategoryModel(object):
         self._generate_kfold_data(data_all)
         return
 
+    def clean_title(self, text):
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = text.lower()
+        no_emoji = CleanDoc(text)._remove_emoji(text)
+        del_symbol = string.punctuation  # ASCII 标点符号，数字
+        remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
+        text = no_emoji.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
+        text = re.sub(r"\s+", " ", text)
+        return text
+
     def _preline(self, line_json):
         # line_json = json.loads(line)
         title = line_json["article_title"]
         content = ""
         dataY = str(line_json["category"])
-        if dataY in ['211','212','213','214','215','216','217','218','219','220','221','222','223','224','225','226','227','228','229','230']:
+        if dataY in ['211', '212', '213', '214', '215', '216', '217', '218', '219', '220', '221', '222', '223', '224', '225', '226', '227', '228', '229', '230']:
             if "text" in line_json:
                 content = line_json["text"]
             elif "html" in line_json:
                 content = self._parse_html(line_json["html"])
             # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
-            dataX = clean_string(title.lower())  # 清洗数据
-            _data = dataX + "\t__label__" + dataY
-            return _data
+            dataX = CleanDoc(title.lower()).text  # 清洗数据
+            if dataX:
+                _data = dataX + "\t__label__" + dataY
+                return _data
         else:
             pass
 
@@ -215,7 +228,7 @@ class BrowserCategoryModel(object):
         with open(json_out_file, 'w', encoding='utf-8') as joutfile:
             s = time.time()
             for line in self.read_json_format_file(json_file):
-                _data = self._preline(line)
+                _data = self._preline(line).split("\t__label__")[0]
                 labels = classifier.predict_proba([_data])
                 line['predict_{}'.format(self._level)] = labels[0][0][0].replace("'", "").replace("__label__", "")
                 # print(line['predict_top_category'])
@@ -252,10 +265,10 @@ class BrowserCategoryModel(object):
 
 if __name__ == '__main__':
     s = time.time()
-    dataDir = "/home/zoushuai/algoproject/tf_project/data/browser_video/ft_model"
+    dataDir = "/data/browser_category"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
     top_model = BrowserCategoryModel(dataDir, category='category', k=5, model_level='category')
-    # top_model.preprocess_data()
+    top_model.preprocess_data()
     train_precision, test_precision = top_model.train_model()
     e = time.time()
     print('训练浏览器分类模型耗时{}'.format(e - s))

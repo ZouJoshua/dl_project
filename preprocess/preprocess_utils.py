@@ -13,6 +13,7 @@ import os
 from pyquery import PyQuery
 import re
 import string
+import emoji
 
 def read_json_format_file(file):
     """
@@ -23,13 +24,17 @@ def read_json_format_file(file):
     if not os.path.exists(file):
         raise FileNotFoundError("【{}】文件未找到，请检查".format(file))
     print(">>>>> 正在读原始取数据文件：{}".format(file))
+    line_count = 0
     with open(file, 'r') as f:
         while True:
             _line = f.readline()
+            line_count += 1
             if not _line:
                 break
             else:
                 line = json.loads(_line.strip())
+                if line_count % 100000 == 0:
+                    print(">>>>> 已读取{}行".format(line_count))
                 yield line
 
 def write_json_format_file(source_data, file):
@@ -166,16 +171,42 @@ class CleanDoc(object):
         text = re.sub(r"\s+", " ", no_symbol)
         return text
 
-    def _remove_emoji(self, text):
+    def _remove_en_emoji(self, text):
         cleaned_text = ""
         for c in text:
             if (ord(c) >= 65 and ord(c) <= 126) or (ord(c) >= 32 and ord(c) <= 63):
                 cleaned_text += c
         return cleaned_text
 
+    def _remove_emoji(self, text):
+        token_list = text.replace("¡", "").replace("¿", "").split(" ")
+        em_str = r":.*?:"
+        em_p = re.compile(em_str, flags=0)
+        clean_token = list()
+        for token in token_list:
+            em = emoji.demojize(token)
+            emj = em_p.search(em)
+            if emj:
+                _e = emj.group(0)
+                # print(_e)
+            else:
+                clean_token.append(token)
+        cleaned_text = " ".join(clean_token)
+        return cleaned_text.strip()
+
+
+
     def _clean_html(self, text):
-        # 去除网址
-        pattern = re.compile(r'(?:https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]')
+        """
+        去除网址
+        1.完整网址https开头的
+        2.没有协议头的网址，www开头的
+        :param text:
+        :return:
+        """
+
+        pattern = re.compile(
+            r'(?:(?:https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])|(?:www\.[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])')
         # pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-zA-Z][0-9a-zA-Z]))+')
         url_list = re.findall(pattern, text)
         for url in url_list:
