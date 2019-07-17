@@ -18,7 +18,7 @@ import numpy as np
 import h5py
 from sklearn.model_selection import StratifiedKFold
 from gensim.models import KeyedVectors
-from preprocess.preprocess_utils import read_json_format_file, split_text, get_ngrams, write_json_format_file
+from preprocess.preprocess_tools import read_json_format_file, split_text, get_ngrams, write_json_format_file
 
 
 class DataSet(object):

@@ -20,8 +20,8 @@ root_dir = os.path.dirname(os.path.dirname(cwd))
 sys.path.append(root_dir)
 sys.path.append(os.path.join(root_dir, "preprocess"))
 
-from preprocess.preprocess_utils import split_text
-from preprocess.preprocess_utils import read_json_format_file, read_txt_file
+from preprocess.preprocess_tools import split_text
+from preprocess.preprocess_tools import read_json_format_file, read_txt_file
 
 
 

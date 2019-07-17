@@ -3,8 +3,8 @@
 """
 @Author  : Joshua
 @Time    : 19-6-12 下午3:06
-@File    : train_game_category.py
-@Desc    : 训练游戏视频分类
+@File    : train_browser_category.py
+@Desc    : 训练浏览器视频分类
 """
 
 
@@ -12,22 +12,24 @@ import os
 from os.path import dirname
 import sys
 root_path = dirname(dirname(dirname(os.path.realpath(__file__))))
-root_nlp_path = dirname(dirname(dirname(os.path.realpath(__file__))))
+root_nlp_path = dirname(dirname(os.path.realpath(__file__)))
 sys.path.append(root_path)
 sys.path.append(root_nlp_path)
 
 
 import json
 import fasttext
-from preprocess.preprocess_utils import clean_string
-from model_normal.evaluate.eval_calculate import evaluate_model
+from preprocess.preprocess_tools import CleanDoc
+from evaluate import evaluate_model
 from sklearn.model_selection import StratifiedKFold
 import time
 import random
+import re
+import string
 
 
 
-class GameCategoryModel(object):
+class BrowserCategoryModel(object):
 
     def __init__(self, dataDir, category='taste', k=5, model_level='taste'):
         self._level = model_level
@@ -69,12 +71,16 @@ class GameCategoryModel(object):
                     print("已处理{}行".format(line_count))
                 if self._preline(line):
                     dataX, dataY = self._preline(line).split('\t__label__')
-                    if dataY in class_cnt and dataX != "":
-                        class_cnt[dataY] += 1
-                    elif dataX != "":
-                        class_cnt[dataY] = 1
-                    if class_cnt[dataY] < 20000 and dataX != "":
-                        data_all.append(line)
+                    # print(dataY)
+                    if dataX:
+                        if str(dataY) in class_cnt:
+                            class_cnt[str(dataY)] += 1
+                        else:
+                            class_cnt[str(dataY)] = 1
+                        if class_cnt[str(dataY)] < 20000 and dataX != "":
+                            data_all.append(line)
+                        else:
+                            continue
                     else:
                         continue
         e = time.time()
@@ -83,20 +89,31 @@ class GameCategoryModel(object):
         self._generate_kfold_data(data_all)
         return
 
+    def clean_title(self, text):
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = text.lower()
+        no_emoji = CleanDoc(text)._remove_emoji(text)
+        del_symbol = string.punctuation  # ASCII 标点符号，数字
+        remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
+        text = no_emoji.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
+        text = re.sub(r"\s+", " ", text)
+        return text
+
     def _preline(self, line_json):
         # line_json = json.loads(line)
         title = line_json["article_title"]
         content = ""
         dataY = str(line_json["category"])
-        if dataY in ["700", "701", "702", "703", "704", "705", "706", "707"]:
+        if dataY in ['211', '212', '213', '214', '215', '216', '217', '218', '219', '220', '221', '222', '223', '224', '225', '226', '227', '228', '229', '230']:
             if "text" in line_json:
                 content = line_json["text"]
             elif "html" in line_json:
                 content = self._parse_html(line_json["html"])
             # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
-            dataX = clean_string((title).lower())  # 清洗数据
-            _data = dataX + "\t__label__" + dataY
-            return _data
+            dataX = CleanDoc(title.lower()).text  # 清洗数据
+            if dataX:
+                _data = dataX + "\t__label__" + dataY
+                return _data
         else:
             pass
 
@@ -191,7 +208,7 @@ class GameCategoryModel(object):
                 test_check_pred_path = os.path.join(data_path, 'data', 'test_check_pred.json')
                 train_check_path = os.path.join(data_path, 'data', 'train_check.json')
                 train_check_pred_path = os.path.join(data_path, 'data', 'train_check_pred.json')
-                classifier = fasttext.supervised(train_data_path, model_path, label_prefix="__label__", lr=0.1, epoch=20, dim=200, word_ngrams=3, loss='hs', bucket=20000)
+                classifier = fasttext.supervised(train_data_path, model_path, label_prefix="__label__", lr=0.1, epoch=20, dim=200, word_ngrams=3, loss='hs', bucket=2000)
                 train_pred = classifier.test(train_data_path)
                 test_pred = classifier.test(test_data_path)
                 train_precision["model_{}".format(i+1)] = train_pred.precision
@@ -211,11 +228,8 @@ class GameCategoryModel(object):
         with open(json_out_file, 'w', encoding='utf-8') as joutfile:
             s = time.time()
             for line in self.read_json_format_file(json_file):
-                _data = self._preline(line)
+                _data = self._preline(line).split("\t__label__")[0]
                 labels = classifier.predict_proba([_data])
-                del line["business_type"]
-                del line["third_category"]
-                del line["inner_type"]
                 line['predict_{}'.format(self._level)] = labels[0][0][0].replace("'", "").replace("__label__", "")
                 # print(line['predict_top_category'])
                 line['predict_{}_proba'.format(self._level)] = labels[0][0][1]
@@ -251,10 +265,10 @@ class GameCategoryModel(object):
 
 if __name__ == '__main__':
     s = time.time()
-    dataDir = "/home/zoushuai/algoproject/tf_project/data/game_video/ft_model"
+    dataDir = "/data/browser_category"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
-    top_model = GameCategoryModel(dataDir, category='category', k=5, model_level='category')
+    top_model = BrowserCategoryModel(dataDir, category='category', k=5, model_level='category')
     top_model.preprocess_data()
     train_precision, test_precision = top_model.train_model()
     e = time.time()
-    print('训练游戏分类模型耗时{}'.format(e - s))
+    print('训练浏览器分类模型耗时{}'.format(e - s))

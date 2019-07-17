@@ -18,8 +18,8 @@ sys.path.append(root_nlp_path)
 
 import json
 import fasttext
-from preprocess.preprocess_utils import CleanDoc
-from model_normal.evaluate.eval_calculate import evaluate_model
+from preprocess.preprocess_tools import CleanDoc
+from evaluate import evaluate_model
 from sklearn.model_selection import StratifiedKFold
 import time
 import random
