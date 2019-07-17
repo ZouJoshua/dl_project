@@ -14,6 +14,7 @@ from pyquery import PyQuery
 import re
 import string
 import emoji
+import time
 
 def read_json_format_file(file):
     """
@@ -36,6 +37,27 @@ def read_json_format_file(file):
                 if line_count % 100000 == 0:
                     print(">>>>> 已读取{}行".format(line_count))
                 yield line
+
+def write_file(file, data, file_format='txt'):
+    print(">>>>> 正在写入文件：{}".format(file))
+    s = time.time()
+    with open(file, 'w', encoding='utf-8') as f:
+        if file_format == 'txt':
+            for line in data:
+                f.write(line)
+                f.write('\n')
+        elif file_format == 'json':
+            for line in data:
+                line_json = json.dumps(line)
+                f.write(line_json)
+                f.write('\n')
+        else:
+            raise Exception("检查数据格式")
+    e = time.time()
+    print('<<<<< 写文件耗时{}'.format(e -s))
+    return
+
+
 
 def write_json_format_file(source_data, file):
     """
@@ -164,21 +186,21 @@ class CleanDoc(object):
         """
         text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
         _text = text.lower()
-        no_html = self._clean_html(_text)
-        no_mail = self._clean_mail(no_html)
-        no_emoji = self._remove_emoji(no_mail)
-        no_symbol = self._remove_symbol(no_emoji)
+        no_html = self.clean_html(_text)
+        no_mail = self.clean_mail(no_html)
+        no_emoji = self.remove_emoji(no_mail)
+        no_symbol = self.remove_symbol(no_emoji)
         text = re.sub(r"\s+", " ", no_symbol)
         return text
 
-    def _remove_en_emoji(self, text):
+    def remove_en_emoji(self, text):
         cleaned_text = ""
         for c in text:
             if (ord(c) >= 65 and ord(c) <= 126) or (ord(c) >= 32 and ord(c) <= 63):
                 cleaned_text += c
         return cleaned_text
 
-    def _remove_emoji(self, text):
+    def remove_emoji(self, text):
         token_list = text.replace("¡", "").replace("¿", "").split(" ")
         em_str = r":.*?:"
         em_p = re.compile(em_str, flags=0)
@@ -194,9 +216,7 @@ class CleanDoc(object):
         cleaned_text = " ".join(clean_token)
         return cleaned_text.strip()
 
-
-
-    def _clean_html(self, text):
+    def clean_html(self, text):
         """
         去除网址
         1.完整网址https开头的
@@ -213,7 +233,7 @@ class CleanDoc(object):
             text = text.replace(url, " ")
         return text.replace("( )", " ")
 
-    def _clean_mail(self, text):
+    def clean_mail(self, text):
         # 去除邮箱
         pattern = re.compile(r"\w+[-_.]*[a-zA-Z0-9]+@[a-zA-Z0-9]+\.[a-zA-Z]{2,3}")
         mail_list = re.findall(pattern, text)
@@ -221,7 +241,7 @@ class CleanDoc(object):
             text = text.replace(mail, " ")
         return text
 
-    def _remove_symbol(self, text):
+    def remove_symbol(self, text):
         del_symbol = string.punctuation + string.digits  # ASCII 标点符号，数字
         remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号

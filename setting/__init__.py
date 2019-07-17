@@ -37,20 +37,19 @@ config path setting
 CONFIG_PATH = os.path.join(PROJECT_ROOT_PATH, 'config')
 DEFAULT_CONFIG_FILE = os.path.join(CONFIG_PATH, 'default.conf')
 
-
-#####
-"""
-data path setting
-"""
-DATA_PATH = os.path.join(PROJECT_ROOT_PATH, 'data')
-
-
 #####
 """
 read config file
 """
 config = configparser.ConfigParser()
 config.read(DEFAULT_CONFIG_FILE, encoding='utf-8')
+
+#####
+"""
+data path setting
+"""
+DATA_PATH_NAME = config.get('DEFAULT.data', 'DEFAULT_DATA_PATH')
+DATA_PATH = os.path.join(PROJECT_ROOT_PATH, DATA_PATH_NAME)
 
 #####
 """

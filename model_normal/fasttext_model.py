@@ -12,10 +12,11 @@
 import fasttext
 import os
 
-from utils.clean_text import clean_zh_text, clean_en_text
+from preprocess.preprocess_tools import clean_zh_text, clean_en_text
 from utils.logger import Logger
-
-log = Logger('fasttext_trian_log', log2console=False, log2file=True, logfile=PROJECT_LOG_FILE).get_logger()
+from setting import LOG_PATH
+LOG_FILE = os.path.join(LOG_PATH, 'fasttext_train_log')
+log = Logger('fasttext_trian_log', log2console=False, log2file=True, logfile=LOG_FILE).get_logger()
 
 
 
@@ -52,10 +53,14 @@ class FastTextClassifier:
                                     epoch=20,
                                     dim=256,
                                     silent=False,
-                                    lr=0.01)
-
+                                    lr=0.01,
+                                    word_ngrams=3,
+                                    loss='hs',
+                                    bucket=2000)
+        train_result = model.test(self.train_path)
+        log.info('训练集准确率： {}'.format(train_result.precision))
         test_result = model.test(self.test_path)
-        print('准确率: ', test_result.precision)
+        log.info('测试集准确率: {}'.format(test_result.precision))
         return model
 
     def predict(self, text):
@@ -65,10 +70,10 @@ class FastTextClassifier:
         :return: 分类后的结果
         """
         if isinstance(text, list):
-            output = self.model.predict(text)
+            output = self.model.predict_proba(text)
         else:
-            output = self.model.predict([text])
-        print('predict:', output)
+            output = self.model.predict_proba([text])
+        # print('predict:', output)
         return output
 
     def load(self, model_path):
