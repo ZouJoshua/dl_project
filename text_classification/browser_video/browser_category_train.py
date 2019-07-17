@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 19-6-12 下午3:06
-@File    : train_browser_category.py
+@File    : browser_category_train.py
 @Desc    : 训练浏览器视频分类
 """
 
@@ -110,7 +110,7 @@ class DataSet(object):
             write_file(train_check_file, train_check, 'json')
             write_file(test_check_file, test_check, 'json')
 
-            self.log.info('文件:{}\n训练数据类别统计：{}'.format(train_file, json.dumps(train_label_count, indent=4))
+            self.log.info('文件:{}\n训练数据类别统计：{}'.format(train_file, json.dumps(train_label_count, indent=4)))
             self.log.info('文件:{}\n测试数据类别统计：{}'.format(test_file, json.dumps(test_label_count, indent=4)))
             if i == 1:
                 break
@@ -260,6 +260,7 @@ if __name__ == '__main__':
     dataDir = "/data/browser_category/train"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
     DataSet(dataDir, logger=log)
-    BrowserCategoryModel(dataDir, logger=log)
+    bcm= BrowserCategoryModel(dataDir, logger=log)
+    bcm.train_model()
     e = time.time()
     print('训练浏览器分类模型耗时{}'.format(e - s))
