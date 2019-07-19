@@ -18,7 +18,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from preprocess.preprocess_tools import CleanDoc, read_json_format_file, write_file
 from model_normal.fasttext_model import FastTextClassifier
-from evaluate.eval_calculate import evaluate_model
+from evaluate.eval_calculate import EvaluateModel
 
 
 import logging
@@ -68,8 +68,8 @@ class DataSet(object):
                     else:
                         continue
         e = time.time()
-        self.log.info('数据分类耗时：\n{}s'.format(e - s))
-        self.log.info('所有数据分类情况:\n{}'.format(class_cnt))
+        self.log.info('数据分类耗时： {}s'.format(e - s))
+        self.log.info('所有数据分类情况： {}'.format(json.dumps(class_cnt, indent=4)))
         self._generate_kfold_data(data_all)
         return
 
@@ -84,7 +84,7 @@ class DataSet(object):
         datax = [self._preline(i).split('\t__label__')[0] for i in data_all]
         datay = [self._preline(i).split('\t__label__')[1] for i in data_all]
         e1 = time.time()
-        self.log.info('数据分X\Y耗时{}'.format(e1 - s))
+        self.log.info('数据分X\Y耗时： {}s'.format(e1 - s))
 
         skf = StratifiedKFold(n_splits=self.k)
         i = 0
@@ -98,7 +98,7 @@ class DataSet(object):
             train_check = [data_all[i] for i in train_index]
             test_check = [data_all[i] for i in test_index]
             e3 = time.time()
-            self.log.info('数据分训练集、测试集耗时{}'.format(e3 - e2))
+            self.log.info('数据分训练集、测试集耗时： {}s'.format(e3 - e2))
 
             model_data_path = self._mkdir_path(i)
             train_file = os.path.join(model_data_path, 'train.txt')
@@ -197,16 +197,18 @@ class BrowserCategoryModel(object):
             if os.path.exists(_data_path):
                 model_path = os.path.join(_data_path, '{}_model'.format(self.bt))
                 train_test_data_path = os.path.join(_data_path, 'data')
-                classifier = FastTextClassifier(model_path, train=True, file_path=train_test_data_path)
+                classifier = FastTextClassifier(model_path, train=True, file_path=train_test_data_path, logger=log)
                 test_check_path = os.path.join(train_test_data_path, 'test_check.json')
                 test_check_pred_path = os.path.join(train_test_data_path, 'test_check_pred.json')
                 train_check_path = os.path.join(train_test_data_path, 'train_check.json')
                 train_check_pred_path = os.path.join(train_test_data_path, 'train_check_pred.json')
                 e = time.time()
-                self.log.info('训练模型耗时{}'.format(e - s))
-                self.predict2file(classifier, train_check_path, train_check_pred_path)
-                self.predict2file(classifier, test_check_path, test_check_pred_path)
-                self.evaluate_model(test_check_pred_path, "category", _model)
+                self.log.info('训练模型耗时： {}s'.format(e - s))
+                # self.predict2file(classifier, train_check_path, train_check_pred_path)
+                # self.predict2file(classifier, test_check_path, test_check_pred_path)
+                label_list = sorted([i.replace("__label__", "") for i in classifier.model.labels])
+                self.log.info("模型标签：\n{}".format(label_list))
+                self.evaluate_model(test_check_pred_path, "category", labels=label_list)
             else:
                 continue
         return
@@ -226,7 +228,7 @@ class BrowserCategoryModel(object):
                 else:
                     continue
             e = time.time()
-            self.log.info('预测及写入文件耗时{}'.format(e - s))
+            self.log.info('预测及写入文件耗时： {}s'.format(e - s))
 
     def _preline(self, line_json):
         if not isinstance(line_json, dict):
@@ -251,16 +253,18 @@ class BrowserCategoryModel(object):
         text = re.sub(r"\s+", " ", text)
         return text
 
-    def evaluate_model(self, datapath, model_level, model_num):
-        return evaluate_model(datapath, model_level, model_num)
+    def evaluate_model(self, datapath, key_, labels=None):
+        em = EvaluateModel(datapath, key_name=key_, logger=self.log, label_names=labels)
+        return em.evaluate_model()
+
 
 
 if __name__ == '__main__':
     s = time.time()
     dataDir = "/data/browser_category/train"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
-    DataSet(dataDir, logger=log)
-    bcm= BrowserCategoryModel(dataDir, logger=log)
+    # DataSet(dataDir, logger=log)
+    bcm = BrowserCategoryModel(dataDir, logger=log)
     bcm.train_model()
     e = time.time()
     print('训练浏览器分类模型耗时{}'.format(e - s))

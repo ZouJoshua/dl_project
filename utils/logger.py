@@ -44,7 +44,8 @@ class Logger(object):
         self.logger.setLevel(logging.DEBUG)
 
         # set formater
-        self.formatstr = '[%(asctime)s] [%(levelname)s] [%(filename)s-%(lineno)d] [PID:%(process)d-TID:%(thread)d] [%(message)s]'
+        # self.formatstr = '[%(asctime)s] [%(levelname)s] [%(filename)s-%(lineno)d] [PID:%(process)d-TID:%(thread)d] [%(message)s]'
+        self.formatstr = '[%(asctime)s] [%(levelname)s] [%(filename)s-%(lineno)d] [%(message)s]'
         self.formatter = logging.Formatter(self.formatstr, "%Y-%m-%d %H:%M:%S")
 
         if log2console:

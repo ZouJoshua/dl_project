@@ -13,11 +13,7 @@ import fasttext
 import os
 
 from preprocess.preprocess_tools import clean_zh_text, clean_en_text
-from utils.logger import Logger
-from setting import LOG_PATH
-LOG_FILE = os.path.join(LOG_PATH, 'fasttext_train_log')
-log = Logger('fasttext_trian_log', log2console=False, log2file=True, logfile=LOG_FILE).get_logger()
-
+import logging
 
 
 class FastTextClassifier:
@@ -27,12 +23,18 @@ class FastTextClassifier:
 
     def __init__(self, model_path,
                  train=False,
-                 file_path=None):
+                 file_path=None, logger=None):
         """
         初始化
         :param file_path: 训练数据路径
         :param model_path: 模型保存路径
         """
+        if logger:
+            self.log = logger
+        else:
+            self.log = logging.getLogger("fasttext_train_log")
+            self.log.setLevel(logging.INFO)
+
         self.model_path = model_path
         if not train:
             self.model = self.load(self.model_path)
@@ -53,14 +55,15 @@ class FastTextClassifier:
                                     epoch=20,
                                     dim=256,
                                     silent=False,
-                                    lr=0.01,
+                                    lr=0.1,
+                                    loss='ns',
+                                    min_count=1,
                                     word_ngrams=3,
-                                    loss='hs',
                                     bucket=2000)
         train_result = model.test(self.train_path)
-        log.info('训练集准确率： {}'.format(train_result.precision))
+        self.log.info('训练集准确率： {}'.format(train_result.precision))
         test_result = model.test(self.test_path)
-        log.info('测试集准确率: {}'.format(test_result.precision))
+        self.log.info('测试集准确率: {}'.format(test_result.precision))
         return model
 
     def predict(self, text):
