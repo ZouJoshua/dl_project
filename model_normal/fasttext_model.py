@@ -58,7 +58,7 @@ class FastTextClassifier:
                                     lr=0.1,
                                     loss='ns',
                                     min_count=1,
-                                    word_ngrams=3,
+                                    word_ngrams=4,
                                     bucket=2000)
         train_result = model.test(self.train_path)
         self.log.info('训练集准确率： {}'.format(train_result.precision))

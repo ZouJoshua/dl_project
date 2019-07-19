@@ -7,7 +7,6 @@
 @Desc    : 训练英语新闻一级分类
 """
 
-import fasttext
 import os
 import json
 import time
@@ -66,11 +65,12 @@ class DataSet(object):
                 # dataY = line["one_level"]
                 if self._preline(line):
                     dataX, dataY = self._preline(line).split('\t__label__')
+                    dataY = line["one_level"]
                     if str(dataY) in class_cnt:
                         class_cnt[str(dataY)] += 1
                     else:
                         class_cnt[str(dataY)] = 1
-                    if class_cnt[str(dataY)] < 20000 and dataX != "":
+                    if class_cnt[str(dataY)] < 40001 and dataX != "":
                         data_all.append(line)
                     else:
                         continue
@@ -209,18 +209,18 @@ class NewsCategoryModel(object):
             if os.path.exists(_data_path):
                 model_path = os.path.join(_data_path, '{}_model'.format(self.bt))
                 train_test_data_path = os.path.join(_data_path, 'data')
-                classifier = FastTextClassifier(model_path, train=True, file_path=train_test_data_path, logger=log)
+                classifier = FastTextClassifier(model_path, train=True, file_path=train_test_data_path, logger=self.log)
                 test_check_path = os.path.join(train_test_data_path, 'test_check.json')
                 test_check_pred_path = os.path.join(train_test_data_path, 'test_check_pred.json')
                 train_check_path = os.path.join(train_test_data_path, 'train_check.json')
                 train_check_pred_path = os.path.join(train_test_data_path, 'train_check_pred.json')
                 e = time.time()
                 self.log.info('训练模型耗时： {}s'.format(e - s))
-                self.predict2file(classifier, train_check_path, train_check_pred_path)
-                self.predict2file(classifier, test_check_path, test_check_pred_path)
-                label_list = sorted([i.replace("__label__", "") for i in classifier.model.labels])
+                # self.predict2file(classifier, train_check_path, train_check_pred_path)
+                # self.predict2file(classifier, test_check_path, test_check_pred_path)
+                label_list = sorted([self.idx_label_map.get(i.replace("__label__", "")) for i in classifier.model.labels])
                 self.log.info("模型标签：\n{}".format(label_list))
-                self.evaluate_model(test_check_pred_path, "one_level", labels=label_list)
+                # self.evaluate_model(test_check_pred_path, "one_level", labels=label_list)
             else:
                 continue
         return
@@ -246,7 +246,7 @@ class NewsCategoryModel(object):
         if not isinstance(line_json, dict):
             self.log.error("该文本行不是json类型")
             raise Exception("该文本行不是json类型")
-        title = line_json["article_title"]
+        title = line_json["title"]
         # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
         dataX = self.clean_title(title)  # 清洗数据
         if dataX:
@@ -274,7 +274,7 @@ if __name__ == '__main__':
     s = time.time()
     dataDir = "/data/en_news"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
-    DataSet(dataDir, logger=log)
+    # DataSet(dataDir, logger=log)
     bcm = NewsCategoryModel(dataDir, logger=log)
     bcm.train_model()
     e = time.time()
