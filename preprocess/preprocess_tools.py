@@ -11,6 +11,7 @@
 import json
 import os
 from pyquery import PyQuery
+from collections import OrderedDict
 import re
 import string
 import emoji
@@ -39,6 +40,13 @@ def read_json_format_file(file):
                 yield line
 
 def write_file(file, data, file_format='txt'):
+    """
+    写入文件，分普通文本格式、每行为json格式
+    :param file: 文件名
+    :param data: 写入数据
+    :param file_format: 格式类型（txt、json）
+    :return:
+    """
     print(">>>>> 正在写入文件：{}".format(file))
     s = time.time()
     with open(file, 'w', encoding='utf-8') as f:
@@ -48,7 +56,7 @@ def write_file(file, data, file_format='txt'):
                 f.write('\n')
         elif file_format == 'json':
             for line in data:
-                line_json = json.dumps(line)
+                line_json = json.dumps(line, ensure_ascii=False)
                 f.write(line_json)
                 f.write('\n')
         else:
@@ -74,7 +82,7 @@ def write_json_format_file(source_data, file):
         if _count % 100000 == 0:
             print("<<<<< 已写入{}行".format(_count))
         if isinstance(_line, dict):
-            line = json.dumps(_line)
+            line = json.dumps(_line, ensure_ascii=False)
             f.write(line + "\n")
         elif isinstance(_line, str):
             f.write(_line + "\n")
@@ -124,6 +132,30 @@ def split_text(text, lower=True, stop=None):
             _text = _text.replace(i, "")
     word_list = _text.split(" ")
     return word_list
+
+def dict_sort(result, limit_num=None):
+    """
+    字典排序
+    :param result:
+    :param limit_num:
+    :return:
+    """
+    _result_sort = sorted(result.items(), key=lambda x: x[1], reverse=True)
+    result_sort = OrderedDict()
+
+    count_limit = 0
+    domain_count = 0
+    for i in _result_sort:
+        if limit_num:
+            if i[1] > limit_num:
+                result_sort[i[0]] = i[1]
+                domain_count += 1
+                count_limit += i[1]
+        else:
+            result_sort[i[0]] = i[1]
+    return result_sort
+
+
 
 def sort_by_value(d):
     items = d.items()
@@ -241,9 +273,15 @@ class CleanDoc(object):
             text = text.replace(mail, " ")
         return text
 
-    def remove_symbol(self, text):
+    def remove_symbol_and_digits(self, text):
         del_symbol = string.punctuation + string.digits  # ASCII 标点符号，数字
         remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
+        text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
+        return text
+
+    def remove_symbol(self, text):
+        del_symbol = string.punctuation  # ASCII 标点符号
+        remove_punctuation_map = dict((ord(char), "") for char in del_symbol)
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         return text
 

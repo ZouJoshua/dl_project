@@ -124,7 +124,7 @@ class EvaluateModel(object):
             confusion_matrix_ = confusion_matrix(y_true, y_pred, labels=self.label_names)
             self.log.debug('\n----混淆矩阵 ---:\n{}'.format(confusion_matrix_))
             class_report = classification_report(y_true, y_pred, target_names=self.label_names)
-            self.log.info('\n----模型整体 ----\nf1_score:{} \nacc_score:{} \nrecall:{}'.format(F1_score, acc, recall_score_))
+            self.log.info('\n----模型整体 ----\nf1_score:\t{} \nacc_score:\t{} \nrecall:\t{}'.format(F1_score, acc, recall_score_))
             self.log.info('\n----结果报告 ---:\n{}'.format(class_report))
 
             # # 画混淆矩阵,画混淆矩阵图

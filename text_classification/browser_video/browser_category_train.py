@@ -20,6 +20,8 @@ from preprocess.preprocess_tools import CleanDoc, read_json_format_file, write_f
 from model_normal.fasttext_model import FastTextClassifier
 from evaluate.eval_calculate import EvaluateModel
 
+from nltk.corpus import stopwords
+
 
 import logging
 from utils.logger import Logger
@@ -30,7 +32,7 @@ log = Logger("fasttext_train_log", log2console=True, log2file=True, logfile=log_
 
 class DataSet(object):
 
-    def __init__(self, data_path, business_type='browser_category', k=5, logger=None):
+    def __init__(self, data_path, feature_model, business_type='browser_category', k=5, logger=None):
         if os.path.exists(data_path) and os.path.isdir(data_path):
             self.data_path = data_path
         else:
@@ -41,6 +43,7 @@ class DataSet(object):
         else:
             self.log = logging.getLogger("fasttext_train_log")
             self.log.setLevel(logging.INFO)
+        self.fe = FeatureExtract(feature_model, logger=self.log)
         self.k = k
         self.bt = business_type
         self.split_dataset()
@@ -131,9 +134,10 @@ class DataSet(object):
             # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
             # dataX = CleanDoc(title.lower()).text  # 清洗数据
             dataX = self.clean_title(title)  # 清洗数据
-
             if dataX:
-                _data = dataX + "\t__label__" + dataY
+                feature_words = self.fe.predict_feature(title)
+                new_text = "{} {}".format(dataX, feature_words).strip()
+                _data = new_text + "\t__label__" + dataY
                 return _data
         else:
             self.log.warning("分类不在211-230内")
@@ -173,9 +177,69 @@ class DataSet(object):
     def _parse_html(self,html):
         pass
 
+class FeatureExtract(object):
+
+    def __init__(self, feature_model, logger=None):
+        self.model_path = feature_model
+
+        if logger:
+            self.log = logger
+        else:
+            self.log = logging.getLogger("fasttext_train_log")
+            self.log.setLevel(logging.INFO)
+        self.model = self.load_model()
+
+    def load_model(self):
+        classifier = FastTextClassifier(self.model_path, train=False, logger=self.log)
+        return classifier
+
+    def predict_feature(self, text):
+        token_words = self.pre_text(text)
+        # print(token_words)
+        if not token_words.strip():
+            feature_words = ""
+        else:
+            # print(token_words)
+            result = self.model.predict(token_words, k=3)
+            pred_prob = result[0][0][1] + result[0][1][1]
+            if result[0][0][1] > 0.9:
+                feature_words = result[0][0][0].replace('__label__', '')
+            else:
+                if pred_prob > 0.9:
+                    feature_words = result[0][0][0].replace('__label__', '') + " " + result[0][1][0].replace('__label__',
+                                                                                                             '')
+                else:
+                    feature_words = result[0][0][0].replace('__label__', '') + " " + result[0][1][0].replace('__label__',
+                                                                                                             '') \
+                                    + " " + result[0][2][0].replace('__label__', '')
+        return feature_words
+
+
+    def pre_text(self, text):
+
+        l_text = text.lower()
+        text_tok = l_text.split(' ')
+        new_tokens_list = list()
+
+        for tok in text_tok:
+            tok = tok.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+            new_tok = CleanDoc(tok).remove_symbol(tok)
+            new_tok = CleanDoc(new_tok).remove_emoji(new_tok)
+            if new_tok and not new_tok.isdigit() and new_tok not in stopwords.words("english"):
+                new_tokens_list.append(new_tok)
+        token_words = " ".join(new_tokens_list)
+
+        return token_words
+
+
+
+
+
+
+
 class BrowserCategoryModel(object):
 
-    def __init__(self, data_path, business_type='browser_category', k=5, logger=None):
+    def __init__(self, data_path, feature_model, business_type='browser_category', k=5, logger=None):
         if os.path.exists(data_path) and os.path.isdir(data_path):
             self.data_path = data_path
         else:
@@ -186,6 +250,7 @@ class BrowserCategoryModel(object):
         else:
             self.log = logging.getLogger("fasttext_train_log")
             self.log.setLevel(logging.INFO)
+        self.fe = FeatureExtract(feature_model, logger=self.log)
         self.k = k
         self.bt = business_type
 
@@ -208,7 +273,7 @@ class BrowserCategoryModel(object):
                 # self.predict2file(classifier, test_check_path, test_check_pred_path)
                 label_list = sorted([i.replace("__label__", "") for i in classifier.model.labels])
                 self.log.info("模型标签：\n{}".format(label_list))
-                self.evaluate_model(test_check_pred_path, "category", labels=label_list)
+                # self.evaluate_model(test_check_pred_path, "category", labels=label_list)
             else:
                 continue
         return
@@ -218,9 +283,9 @@ class BrowserCategoryModel(object):
             s = time.time()
             for line in read_json_format_file(json_file):
                 _data = self._preline(line)
-                if _data:
+                if _data.strip():
                     labels = classifier.predict([_data])
-                    line['predict_category'] = labels[0][0][0].replace("'", "").replace("__label__", "")
+                    line['predict_category'] = labels[0][0][0].replace("__label__", "")
                     # print(line['predict_top_category'])
                     line['predict_category_proba'] = labels[0][0][1]
                     joutfile.write(json.dumps(line) + "\n")
@@ -238,7 +303,9 @@ class BrowserCategoryModel(object):
         # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
         dataX = self.clean_title(title)  # 清洗数据
         if dataX:
-            _data = dataX
+            feature_words = self.fe.predict_feature(title)
+            new_text = "{} {}".format(dataX, feature_words).strip()
+            _data = new_text
             return _data
         else:
             return None
@@ -255,16 +322,17 @@ class BrowserCategoryModel(object):
 
     def evaluate_model(self, datapath, key_, labels=None):
         em = EvaluateModel(datapath, key_name=key_, logger=self.log, label_names=labels)
-        return em.evaluate_model()
+        return em.evaluate_model_v2()
 
 
 
 if __name__ == '__main__':
     s = time.time()
     dataDir = "/data/browser_category/train"
+    feature_model = "/data/browser_category/category_feature_words/category_feature"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
-    # DataSet(dataDir, logger=log)
-    bcm = BrowserCategoryModel(dataDir, logger=log)
+    # DataSet(dataDir, feature_model, logger=log)
+    bcm = BrowserCategoryModel(dataDir, feature_model, logger=log)
     bcm.train_model()
     e = time.time()
     print('训练浏览器分类模型耗时{}'.format(e - s))

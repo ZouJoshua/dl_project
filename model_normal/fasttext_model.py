@@ -52,10 +52,10 @@ class FastTextClassifier:
         model = fasttext.supervised(self.train_path,
                                     self.model_path,
                                     label_prefix="__label__",
-                                    epoch=20,
+                                    epoch=50,
                                     dim=256,
                                     silent=False,
-                                    lr=0.1,
+                                    lr=0.05,
                                     loss='ns',
                                     min_count=1,
                                     word_ngrams=4,
@@ -66,16 +66,16 @@ class FastTextClassifier:
         self.log.info('测试集准确率: {}'.format(test_result.precision))
         return model
 
-    def predict(self, text):
+    def predict(self, text, k=1):
         """
         预测一条数据,由于fasttext获取的参数是列表,如果只是简单输入字符串,会将字符串按空格拆分组成列表进行推理
         :param text: 待分类的数据
         :return: 分类后的结果
         """
         if isinstance(text, list):
-            output = self.model.predict_proba(text)
+            output = self.model.predict_proba(text, k=k)
         else:
-            output = self.model.predict_proba([text])
+            output = self.model.predict_proba([text], k=k)
         # print('predict:', output)
         return output
 
