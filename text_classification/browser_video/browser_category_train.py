@@ -53,30 +53,39 @@ class DataSet(object):
         # print(">>>>> 预处理数据文件...")
         fnames = os.listdir(self.data_path)
         datafiles = [os.path.join(self.data_path, fname) for fname in fnames]
-        data_all = list()
+        ori_data_all = list()
+        pre_data_all = list()
         class_cnt = dict()
         s = time.time()
         for datafile in datafiles:
             # print(">>>>> 正在处理数据文件：{}".format(datafile))
             self.log.info("正在处理数据文件:{}".format(datafile))
             for line in read_json_format_file(datafile):
-                if self._preline(line):
-                    dataX, dataY = self._preline(line).split('\t__label__')
-                    if str(dataY) in class_cnt:
-                        class_cnt[str(dataY)] += 1
-                    else:
-                        class_cnt[str(dataY)] = 1
-                    if class_cnt[str(dataY)] < 20000 and dataX != "":
-                        data_all.append(line)
-                    else:
-                        continue
+                title = line["article_title"]
+                label = str(line["category"])
+                if label in class_cnt:
+                    class_cnt[label] += 1
+                else:
+                    class_cnt[label] = 1
+                if class_cnt[label] < 20000 and title != "":
+                    pre_line = self._preline(line)
+                    if pre_line:
+                        dataX, dataY = pre_line.split('\t__label__')
+                        if dataY in ["211", "212", "213", "214", "226", "229", "230", "222", "216", "227"]:
+                            dataY = "200"
+                        if dataX and dataY:
+                            pre_data_all.append((dataX, dataY))
+                            line["category"] = dataY
+                            ori_data_all.append(line)
+                else:
+                    continue
         e = time.time()
         self.log.info('数据分类耗时： {}s'.format(e - s))
         self.log.info('所有数据分类情况： {}'.format(json.dumps(class_cnt, indent=4)))
-        self._generate_kfold_data(data_all)
+        self._generate_kfold_data(pre_data_all, ori_data_all)
         return
 
-    def _generate_kfold_data(self, data_all):
+    def _generate_kfold_data(self, data_all, ori_data_all):
         """
         按照label分层数据
         :param train_format_data:
@@ -84,8 +93,8 @@ class DataSet(object):
         """
         s = time.time()
         random.shuffle(data_all)
-        datax = [self._preline(i).split('\t__label__')[0] for i in data_all]
-        datay = [self._preline(i).split('\t__label__')[1] for i in data_all]
+        datax = [i[0] for i in data_all]
+        datay = [i[1] for i in data_all]
         e1 = time.time()
         self.log.info('数据分X\Y耗时： {}s'.format(e1 - s))
 
@@ -96,10 +105,10 @@ class DataSet(object):
             e2 = time.time()
             train_label_count = self._label_count([datay[i] for i in train_index])
             test_label_count = self._label_count([datay[j] for j in test_index])
-            train_data = [self._preline(data_all[i]) for i in train_index]
-            test_data = [self._preline(data_all[j]) for j in test_index]
-            train_check = [data_all[i] for i in train_index]
-            test_check = [data_all[i] for i in test_index]
+            train_data = ["{}\t__label__{}".format(data_all[i][0], data_all[i][1]) for i in train_index]
+            test_data = ["{}\t__label__{}".format(data_all[j][0], data_all[j][1]) for j in test_index]
+            train_check = [ori_data_all[i] for i in train_index]
+            test_check = [ori_data_all[i] for i in test_index]
             e3 = time.time()
             self.log.info('数据分训练集、测试集耗时： {}s'.format(e3 - e2))
 
@@ -131,11 +140,12 @@ class DataSet(object):
                 content = line_json["text"]
             elif "html" in line_json:
                 content = self._parse_html(line_json["html"])
-            # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
+            dataX = self.clean_content(title + ' ' + content)  # 清洗数据
             # dataX = CleanDoc(title.lower()).text  # 清洗数据
-            dataX = self.clean_title(title)  # 清洗数据
+            # dataX = self.clean_title(title)  # 清洗数据
             if dataX:
-                feature_words = self.fe.predict_feature(title)
+                # feature_words = self.fe.predict_feature(title)
+                feature_words = ""
                 new_text = "{} {}".format(dataX, feature_words).strip()
                 _data = new_text + "\t__label__" + dataY
                 return _data
@@ -171,6 +181,17 @@ class DataSet(object):
         remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
         text = no_emoji.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         text = re.sub(r"\s+", " ", text)
+        return text
+
+    def clean_content(self, text):
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = text.lower()
+        cd_instance = CleanDoc(text)
+        no_emoji = cd_instance.remove_emoji(text)
+        no_url = cd_instance.clean_html(no_emoji)
+        no_mail = cd_instance.clean_mail(no_url)
+        no_symbol = cd_instance.remove_symbol(no_mail)
+        text = re.sub(r"\s+", " ", no_symbol)
         return text
 
 
@@ -269,11 +290,11 @@ class BrowserCategoryModel(object):
                 train_check_pred_path = os.path.join(train_test_data_path, 'train_check_pred.json')
                 e = time.time()
                 self.log.info('训练模型耗时： {}s'.format(e - s))
-                # self.predict2file(classifier, train_check_path, train_check_pred_path)
-                # self.predict2file(classifier, test_check_path, test_check_pred_path)
+                self.predict2file(classifier, train_check_path, train_check_pred_path)
+                self.predict2file(classifier, test_check_path, test_check_pred_path)
                 label_list = sorted([i.replace("__label__", "") for i in classifier.model.labels])
                 self.log.info("模型标签：\n{}".format(label_list))
-                # self.evaluate_model(test_check_pred_path, "category", labels=label_list)
+                self.evaluate_model(test_check_pred_path, "category", labels=label_list)
             else:
                 continue
         return
@@ -300,10 +321,12 @@ class BrowserCategoryModel(object):
             self.log.error("该文本行不是json类型")
             raise Exception("该文本行不是json类型")
         title = line_json["article_title"]
-        # dataX = clean_string((title + '.' + content).lower())  # 清洗数据
-        dataX = self.clean_title(title)  # 清洗数据
+        content = line_json["text"]
+        dataX = self.clean_content(title + ' ' + content)  # 清洗数据
+        # dataX = self.clean_title(title)  # 清洗数据
         if dataX:
-            feature_words = self.fe.predict_feature(title)
+            # feature_words = self.fe.predict_feature(title)
+            feature_words = ""
             new_text = "{} {}".format(dataX, feature_words).strip()
             _data = new_text
             return _data
@@ -320,6 +343,17 @@ class BrowserCategoryModel(object):
         text = re.sub(r"\s+", " ", text)
         return text
 
+    def clean_content(self, text):
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = text.lower()
+        cd_instance = CleanDoc(text)
+        no_emoji = cd_instance.remove_emoji(text)
+        no_url = cd_instance.clean_html(no_emoji)
+        no_mail = cd_instance.clean_mail(no_url)
+        no_symbol = cd_instance.remove_symbol(no_mail)
+        text = re.sub(r"\s+", " ", no_symbol)
+        return text
+
     def evaluate_model(self, datapath, key_, labels=None):
         em = EvaluateModel(datapath, key_name=key_, logger=self.log, label_names=labels)
         return em.evaluate_model_v2()
@@ -331,7 +365,7 @@ if __name__ == '__main__':
     dataDir = "/data/browser_category/train"
     feature_model = "/data/browser_category/category_feature_words/category_feature"
     # dataDir = "/data/emotion_analysis/taste_ft_model"
-    # DataSet(dataDir, feature_model, logger=log)
+    DataSet(dataDir, feature_model, logger=log)
     bcm = BrowserCategoryModel(dataDir, feature_model, logger=log)
     bcm.train_model()
     e = time.time()

@@ -260,17 +260,19 @@ class CleanDoc(object):
         pattern = re.compile(
             r'(?:(?:https?|ftp|file)://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])|(?:www\.[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])')
         # pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-zA-Z][0-9a-zA-Z]))+')
-        url_list = re.findall(pattern, text)
-        for url in url_list:
-            text = text.replace(url, " ")
+        # url_list = re.findall(pattern, text)
+        # for url in url_list:
+        #     text = text.replace(url, " ")
+        text = pattern.sub("", text)
         return text.replace("( )", " ")
 
     def clean_mail(self, text):
         # 去除邮箱
         pattern = re.compile(r"\w+[-_.]*[a-zA-Z0-9]+@[a-zA-Z0-9]+\.[a-zA-Z]{2,3}")
-        mail_list = re.findall(pattern, text)
-        for mail in mail_list:
-            text = text.replace(mail, " ")
+        text = pattern.sub(" ", text)
+        # mail_list = re.findall(pattern, text)
+        # for mail in mail_list:
+        #     text = text.replace(mail, " ")
         return text
 
     def remove_symbol_and_digits(self, text):
@@ -281,7 +283,7 @@ class CleanDoc(object):
 
     def remove_symbol(self, text):
         del_symbol = string.punctuation  # ASCII 标点符号
-        remove_punctuation_map = dict((ord(char), "") for char in del_symbol)
+        remove_punctuation_map = dict((ord(char), " ") for char in del_symbol)
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         return text
 
