@@ -11,9 +11,15 @@
 
 import fasttext
 import os
+import json
+import logging
+
+try:
+    import configparser
+except:
+    from six.moves import configparser
 
 from preprocess.preprocess_tools import clean_zh_text, clean_en_text
-import logging
 
 
 class FastTextClassifier:
@@ -21,14 +27,16 @@ class FastTextClassifier:
     利用fasttext来对文本进行分类
     """
 
-    def __init__(self, model_path,
-                 train=False,
+    def __init__(self, model_path, args_config_file,
+                 args_section, train=False,
                  file_path=None, logger=None):
         """
         初始化
         :param file_path: 训练数据路径
         :param model_path: 模型保存路径
         """
+        self.config_file = args_config_file
+        self.args_section = args_section
         if logger:
             self.log = logger
         else:
@@ -49,22 +57,39 @@ class FastTextClassifier:
         """
         训练:参数可以针对性修改,进行调优
         """
+        args_dict = self.get_train_args(section="fasttext.args")
         model = fasttext.supervised(self.train_path,
                                     self.model_path,
-                                    label_prefix="__label__",
-                                    epoch=20,
-                                    dim=256,
-                                    silent=False,
-                                    lr=0.1,
-                                    loss='ns',
-                                    min_count=1,
-                                    word_ngrams=4,
-                                    bucket=2000)
+                                    **args_dict)
+
         train_result = model.test(self.train_path)
         self.log.info('训练集准确率： {}'.format(train_result.precision))
         test_result = model.test(self.test_path)
         self.log.info('测试集准确率: {}'.format(test_result.precision))
         return model
+
+    def get_train_args(self, section=None):
+        config = configparser.ConfigParser()
+        config.read(self.config_file, encoding='utf-8')
+        if not section:
+            section = "fasttext.args"
+        args_list = config.options(section)
+        self.log.info("配置文件参数列表：{}".format(args_list))
+        args_dict = dict()
+        args_dict["label_prefix"] = config.get(section, "label_prefix")
+        args_dict["epoch"] = config.getint(section, "epoch")
+        args_dict["silent"] = config.getboolean(section, "silent")
+        args_dict["lr"] = config.getfloat(section, "lr")
+        args_dict["minn"] = config.getint(section, "minn")
+        args_dict["maxn"] = config.getint(section, "maxn")
+        args_dict["loss"] = config.get(section, "loss")
+        args_dict["min_count"] = config.getint(section, "min_count")
+        args_dict["word_ngrams"] = config.getint(section, "word_ngrams")
+        args_dict["bucket"] = config.getint(section, "bucket")
+        self.log.info("训练参数：{}".format(json.dumps(args_dict, indent=4)))
+        return args_dict
+
+
 
     def predict(self, text, k=1):
         """
