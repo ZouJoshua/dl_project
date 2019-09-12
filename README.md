@@ -20,3 +20,8 @@ All code of tensorflow
 > 缺点
    1. 不是nlp独立库， 需要另一个库进行预处理步骤
  
+
+
+-[x] caffe 环境部署
+
+- [centos caffe部署]()
