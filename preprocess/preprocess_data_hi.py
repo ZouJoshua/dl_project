@@ -367,7 +367,7 @@ def main():
     # 处理语料
     # data_base_dir = r'/data/in_hi_news/train_data'
     data_base_dir = r"/home/joshua/tensorflowProject/tensorflow_project/data/hi_news"
-    file1 = os.path.join(data_base_dir, 'topcategory_all')
+    file1 = os.path.join(data_base_dir, )
     file2 = os.path.join(data_base_dir, 'auto_science_tech')
     out_file = os.path.join(data_base_dir, 'top_category_corpus')
     TopcategoryCorpus(file1, file2, out_file)
