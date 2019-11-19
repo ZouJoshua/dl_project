@@ -17,7 +17,7 @@ from mnist_digit_recognition import mnist_backward
 
 TEST_INTERVAL_SECS = 5
 
-def test(mnist):
+def mnist_test(mnist):
     with tf.Graph().as_default() as g:
         x = tf.placeholder(tf.float32, [None, mnist_forward.INPUT_NODE])
         y_ = tf.placeholder(tf.float32, [None, mnist_forward.OUTPUT_NODE])
@@ -38,7 +38,7 @@ def test(mnist):
                     saver.restore(sess, ckpt.model_checkpoint_path)
                     global_step = ckpt.model_checkpoint_path.split("/")[-1].split('-')[-1]
                     accuracy_score = sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels})
-                    print("After %d training step(s), test accuracy = %g" % (global_step, accuracy_score))
+                    print("After %s training step(s), test accuracy = %g" % (global_step, accuracy_score))
                 else:
                     print("No checkpoint file found")
                     return
@@ -47,7 +47,7 @@ def test(mnist):
 
 def main():
     mnist = input_data.read_data_sets("./MNIST_data", one_hot=True)
-    test(mnist)
+    mnist_test(mnist)
 
 if __name__ == "__main__":
     main()

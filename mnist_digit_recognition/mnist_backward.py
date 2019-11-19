@@ -42,7 +42,7 @@ def backward(mnist):
         staircase=True
     )
 
-    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss, global_step=global_step)
 
     ema = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
     ema_op = ema.apply(tf.trainable_variables())
@@ -50,7 +50,10 @@ def backward(mnist):
     with tf.control_dependencies([train_step, ema_op]):
         train_op = tf.no_op(name="train")
 
-    saver = tf.train.Saver()
+    correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+    saver = tf.train.Saver(max_to_keep=3)
 
     with tf.Session() as sess:
         init_op = tf.global_variables_initializer()
@@ -66,7 +69,8 @@ def backward(mnist):
             xs, ys = mnist.train.next_batch(BATCH_SIZE)
             _, loss_value, step = sess.run([train_step, loss, global_step], feed_dict={x:xs, y_:ys})
             if i % 1000 == 0:
-                print("After %d training step(s), loss on training batch is %g." % (i, loss_value))
+                accuracy_score = sess.run(accuracy, feed_dict={x:mnist.test.images, y_:mnist.test.labels})
+                print("After %d training step(s), loss on training batch is %g, acc on test is %g" % (step, loss_value, accuracy_score))
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
 
 def main():
