@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 10:54 PM
-@File    : mnist_forward.py
+@File    : nn_forward.py
 @Desc    : 前向传播
 
 """

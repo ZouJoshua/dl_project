@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 11:41 PM
-@File    : mnist_test.py
+@File    : nn_test.py
 @Desc    : mnist_forward mnist_backward 测试
 
 """
@@ -11,20 +11,20 @@
 import time
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from mnist_digit_recognition import mnist_forward
-from mnist_digit_recognition import mnist_backward
+from mnist_digit_recognition import nn_forward
+from mnist_digit_recognition import nn_backward
 
 
 TEST_INTERVAL_SECS = 5
 
 def mnist_test(mnist):
     with tf.Graph().as_default() as g:
-        x = tf.placeholder(tf.float32, [None, mnist_forward.INPUT_NODE])
-        y_ = tf.placeholder(tf.float32, [None, mnist_forward.OUTPUT_NODE])
+        x = tf.placeholder(tf.float32, [None, nn_forward.INPUT_NODE])
+        y_ = tf.placeholder(tf.float32, [None, nn_forward.OUTPUT_NODE])
 
-        y = mnist_forward.forward(x, None)
+        y = nn_forward.forward(x, None)
 
-        ema = tf.train.ExponentialMovingAverage(mnist_backward.MOVING_AVERAGE_DECAY)
+        ema = tf.train.ExponentialMovingAverage(nn_backward.MOVING_AVERAGE_DECAY)
         ema_restore = ema.variables_to_restore()
         saver = tf.train.Saver(ema_restore)
 
@@ -33,7 +33,7 @@ def mnist_test(mnist):
 
         while True:
             with tf.Session() as sess:
-                ckpt = tf.train.get_checkpoint_state(mnist_backward.MODEL_SAVE_PATH)
+                ckpt = tf.train.get_checkpoint_state(nn_backward.MODEL_SAVE_PATH)
                 if ckpt and ckpt.model_checkpoint_path:
                     saver.restore(sess, ckpt.model_checkpoint_path)
                     global_step = ckpt.model_checkpoint_path.split("/")[-1].split('-')[-1]

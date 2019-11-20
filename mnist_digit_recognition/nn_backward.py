@@ -3,14 +3,15 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 11:13 PM
-@File    : mnist_backward.py
+@File    : nn_backward.py
 @Desc    : 反向传播过程
 
 """
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from mnist_digit_recognition import mnist_forward
+from mnist_digit_recognition import nn_forward
+from mnist_digit_recognition import generateds
 import os
 
 
@@ -22,12 +23,13 @@ STEPS = 50000
 MOVING_AVERAGE_DECAY = 0.99
 MODEL_SAVE_PATH = "./model/"
 MODEL_NAME = "mnist_model"
+train_num_examples = 60000  # mnist.train.num_examples
 
 
 def backward(mnist):
-    x = tf.placeholder(tf.float32, [None, mnist_forward.INPUT_NODE])
-    y_ = tf.placeholder(tf.float32, [None, mnist_forward.OUTPUT_NODE])
-    y = mnist_forward.forward(x, REGULARIZER)
+    x = tf.placeholder(tf.float32, [None, nn_forward.INPUT_NODE])
+    y_ = tf.placeholder(tf.float32, [None, nn_forward.OUTPUT_NODE])
+    y = nn_forward.forward(x, REGULARIZER)
     global_step = tf.Variable(0, trainable=False)
 
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=y, labels=tf.argmax(y_, 1))
@@ -54,6 +56,7 @@ def backward(mnist):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     saver = tf.train.Saver(max_to_keep=3)
+    # img_batch, label_batch = mnist_generateds.get_tfrecord(BATCH_SIZE, isTrain=True)
 
     with tf.Session() as sess:
         init_op = tf.global_variables_initializer()
@@ -64,14 +67,20 @@ def backward(mnist):
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
 
+        # coord = tf.train.Coordinator()
+        # threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
         for i in range(STEPS):
             xs, ys = mnist.train.next_batch(BATCH_SIZE)
+            # xs, ys = sess.run([img_batch, label_batch])
             _, loss_value, step = sess.run([train_step, loss, global_step], feed_dict={x:xs, y_:ys})
             if i % 1000 == 0:
                 accuracy_score = sess.run(accuracy, feed_dict={x:mnist.test.images, y_:mnist.test.labels})
                 print("After %d training step(s), loss on training batch is %g, acc on test is %g" % (step, loss_value, accuracy_score))
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
+        # coord.request_stop()
+        # coord.join(threads)
+
 
 def main():
     mnist = input_data.read_data_sets("./MNIST_data", one_hot=True)
