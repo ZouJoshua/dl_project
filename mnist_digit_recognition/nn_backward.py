@@ -26,6 +26,9 @@ MODEL_NAME = "mnist_model"
 train_num_examples = 60000  # mnist.train.num_examples
 
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+
 def backward(mnist):
     x = tf.placeholder(tf.float32, [None, nn_forward.INPUT_NODE])
     y_ = tf.placeholder(tf.float32, [None, nn_forward.OUTPUT_NODE])
@@ -58,7 +61,11 @@ def backward(mnist):
     saver = tf.train.Saver(max_to_keep=3)
     # img_batch, label_batch = mnist_generateds.get_tfrecord(BATCH_SIZE, isTrain=True)
 
-    with tf.Session() as sess:
+    gpu_config = tf.ConfigProto()
+    gpu_config.allow_soft_placement=True
+    gpu_config.gpu_options.allow_growth=True
+
+    with tf.Session(config=gpu_config) as sess:
         init_op = tf.global_variables_initializer()
         sess.run(init_op)
 
@@ -73,10 +80,11 @@ def backward(mnist):
         for i in range(STEPS):
             xs, ys = mnist.train.next_batch(BATCH_SIZE)
             # xs, ys = sess.run([img_batch, label_batch])
-            _, loss_value, step = sess.run([train_step, loss, global_step], feed_dict={x:xs, y_:ys})
+            # _, loss_value, step = sess.run([train_step, loss, global_step], feed_dict={x:xs, y_:ys})
+            _, loss_value, step = sess.run([train_op, loss, global_step], feed_dict={x:xs, y_:ys})
             if i % 1000 == 0:
-                accuracy_score = sess.run(accuracy, feed_dict={x:mnist.test.images, y_:mnist.test.labels})
-                print("After %d training step(s), loss on training batch is %g, acc on test is %g" % (step, loss_value, accuracy_score))
+                # accuracy_score = sess.run(accuracy, feed_dict={x:mnist.test.images, y_:mnist.test.labels})
+                print("After %d training step(s), loss on training batch is %g" % (step, loss_value))
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
         # coord.request_stop()
         # coord.join(threads)

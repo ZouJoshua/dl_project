@@ -24,6 +24,8 @@ MODEL_SAVE_PATH = "./model/"
 MODEL_NAME = "mnist_model"
 train_num_examples = 60000  # mnist.train.num_examples
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 
 def backward(mnist):
     x = tf.placeholder(tf.float32, shape=[
@@ -57,10 +59,16 @@ def backward(mnist):
     with tf.control_dependencies([train_step, ema_op]):
         train_op = tf.no_op(name="train")
 
+    correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     saver = tf.train.Saver(max_to_keep=3)
 
-    with tf.Session() as sess:
+    gpu_config = tf.ConfigProto()
+    gpu_config.allow_soft_placement = True
+    gpu_config.gpu_options.allow_growth = True
+
+    with tf.Session(config=gpu_config) as sess:
         init_op = tf.global_variables_initializer()
         sess.run(init_op)
 
