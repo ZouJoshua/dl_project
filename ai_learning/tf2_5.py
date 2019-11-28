@@ -87,7 +87,7 @@ with tf.Session() as sess:
         start = (BATCH_SIZE*i) % 300
         end = start + BATCH_SIZE
         sess.run(train_step, feed_dict={x: X[start:end], y_: Y_[start:end]})
-        if i % 2000 ==0:
+        if i % 2000 == 0:
             loss_mse_val = sess.run(loss_mse, feed_dict={x: X, y_: Y_})
             print("After %d steps, loss is: %f" % (i, loss_mse_val))
     # xx在-3到3之间以步长0.01， yy在-3到3之间以步长0.01，生成二维网格坐标点
