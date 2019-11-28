@@ -16,11 +16,13 @@
 2.总流程：卷积层1->卷积层2->卷积层3->卷积层4->全连接层->全连接层->输出:softmax
 3.shape的变化：[28x28x1]->[14x14x64]->[7x7x128]->[4x4x256]->[2x2x512]->[1024]->[1024]->[10]
 """
-
-import data.input_data as input_data
-mnist = input_data.read_data_sets("MNIST/", one_hot=True)
-
 import tensorflow as tf
+from tensorflow.examples.tutorials.mnist import input_data
+
+
+mnist_data_dir = "/data/work/dl_project/data/mnist"
+mnist = input_data.read_data_sets(mnist_data_dir, one_hot=True)
+
 
 # Parameters
 learning_rate = 0.001
@@ -29,9 +31,9 @@ batch_size = 64
 display_step = 20
 
 # Network Parameters
-n_input = 784 # MNIST data input (img shape: 28*28)
-n_classes = 10 # MNIST total classes (0-9 digits)
-dropout = 0.8 # Dropout, probability to keep units
+n_input = 784  # MNIST data input (img shape: 28*28)
+n_classes = 10  # MNIST total classes (0-9 digits)
+dropout = 0.8  # Dropout, probability to keep units
 
 # tf Graph input
 x = tf.placeholder(tf.float32, [None, n_input])
@@ -51,20 +53,20 @@ def customnet(_X, _weights, _biases, _dropout):
     # Reshape input picture
     _X = tf.reshape(_X,shape=[-1,28,28,1])
     # Convolution Layer
-    conv1 = conv2d('conv1',_X,_weights['wc1'],_biases['bc1'])
+    conv1 = conv2d('conv1', _X, _weights['wc1'], _biases['bc1'])
     # Max Pooling (down-sampling)
-    pool1 = max_pool('conv1',conv1,k=2)
+    pool1 = max_pool('conv1', conv1, k=2)
     # Apply Normalization
-    norm1 = normal('conv1',pool1,lsize=4)
+    norm1 = normal('conv1', pool1, lsize=4)
     # Apply Dropout
     norm = tf.nn.dropout(norm1, _dropout)
     # Convolution Layer
-    conv2 = conv2d('conv2',norm1,_weights['wc2'],_biases['bc2'])
+    conv2 = conv2d('conv2', norm1, _weights['wc2'], _biases['bc2'])
     pool2 = max_pool('conv2', conv2, k=2)
-    norm2 = normal('conv2',pool2,lsize=4)
-    norm2 = tf.nn.dropout(norm2,_dropout)
+    norm2 = normal('conv2', pool2, lsize=4)
+    norm2 = tf.nn.dropout(norm2, _dropout)
     # Convolution Layer
-    conv3 = conv2d('conv3',norm2,_weights['wc3'],_biases['bc3'])
+    conv3 = conv2d('conv3', norm2, _weights['wc3'], _biases['bc3'])
     # Max Pooling (down-sampling)
     pool3 = max_pool('conv3', conv3, k=2)
     # Apply Normalization
@@ -113,7 +115,7 @@ cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=p
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
 
 # Evaluate model
-correct_pred = tf.equal(tf.argmax(pred,1), tf.argmax(y,1))
+correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 # Initializing the variables
