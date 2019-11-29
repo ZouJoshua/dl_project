@@ -18,11 +18,8 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from image_classification import vgg16
-from image_classification import utils
-
-
-labels = []
+from image_classification.vgg16_classification import utils, vgg16
+from image_classification.vgg16_classification.labels_dict import labels
 
 
 img_path = input("Input the path and image name:")
@@ -35,7 +32,7 @@ with tf.Session() as sess:
     # 定义一个维度为【1,224,224,3】，类型为float32的tensor占位符
     x = tf.placeholder(tf.float32, [1, 224, 224, 3])
     vgg = vgg16.Vgg16()
-    vgg.forward()
+    vgg.forward(x)
 
     # 将一个batch的数据喂入网络，得到网络的预测输出
     probability = sess.run(vgg.prob, feed_dict={x: img_ready})
@@ -63,6 +60,6 @@ with tf.Session() as sess:
     ax.set_title("Top-5")
 
     for a, b in zip(range(len(values)), values):
-        ax.text(a, b+0.0005, utils.percent(b), ha="center", va="bottom", fontsize=7)
+        ax.text(a, b + 0.0005, utils.percent(b), ha="center", va="bottom", fontsize=7)
     plt.savefig("./result.jpg")
     plt.show()
