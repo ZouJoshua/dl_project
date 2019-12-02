@@ -24,9 +24,11 @@ class Vgg16():
 
     def __init__(self, vgg16_path=None):
         if vgg16_path is None:
-            vgg16_path = os.path.join(os.getcwd(), 'vgg16.npy')
+            data_dir = "/data/work/dl_project/data/vgg16"
+            vgg16_path = os.path.join(data_dir, 'vgg16.npy')
+            # vgg16_path = os.path.join(os.getcwd(), 'vgg16.npy')
             print(vgg16_path)
-            self.data_dict = np.load(vgg16_path, encoding='latinl').items()  # 遍历其内键值对，导入模型参数
+            self.data_dict = np.load(vgg16_path, encoding='latin1').item()  # 遍历其内键值对，导入模型参数
 
         for x in self.data_dict:
             print(x)
@@ -53,8 +55,8 @@ class Vgg16():
         # 构建VGG16层网络（包含5段卷积，3层全连接），并逐层根据命名空间读取网络参数
         # 第一段卷积，含有两个卷积层，后面接最大池化层，用来缩小图片尺寸
         # 传入命名空间的name， 来获取该层的卷积核和偏置，并做卷积运算， 最后返回经过激活函数后的值
-        self.conv1_1 = self.convl_layer(bgr, "conv1_1")
-        self.conv1_2 = self.convl_layer(self.conv1_1, "conv1_2")
+        self.conv1_1 = self.conv_layer(bgr, "conv1_1")
+        self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
         # 根据传入的pooling名字对该层做相应的池化操作
         self.pool1 = self.max_pool_2x2(self.conv1_2, "pool1")
 

@@ -9,7 +9,7 @@
 """
 
 
-from skimage import io,transform
+from skimage import io, transform
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -30,8 +30,8 @@ def load_image(path):
     ax0.imshow(img)
 
     short_edge = min(img.shape[:2])  # 找到该图像的最短边
-    y = (img.shape[0] - short_edge) / 2
-    x = (img.shape[1] - short_edge) / 2  # 把图像的w和h分别减去最短边，并求平均
+    y = int((img.shape[0] - short_edge) / 2)
+    x = int((img.shape[1] - short_edge) / 2)  # 把图像的w和h分别减去最短边，并求平均
     crop_img = img[y:y+short_edge, x:x+short_edge]  # 取出且分出的中心图像
     print(crop_img.shape)
 
@@ -56,6 +56,5 @@ def percent(value):
     :return:
     """
     return "%.2f%%" % (value * 100)
-
 
 
