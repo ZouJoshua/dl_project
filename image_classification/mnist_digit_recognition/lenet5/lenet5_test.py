@@ -11,8 +11,7 @@
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition import lenet5_forward
-from image_classification.mnist_digit_recognition import lenet5_backward
+from image_classification.mnist_digit_recognition.lenet5 import lenet5_backward, lenet5_forward
 import numpy as np
 import time
 import os

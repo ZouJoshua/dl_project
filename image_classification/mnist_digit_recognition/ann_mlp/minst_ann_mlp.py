@@ -23,8 +23,8 @@ n_hidden_2 = 256#2nd layer num features
 n_input = 784
 n_classses = 10
 
-x = tf.placeholder("float", [None,n_input])
-y = tf.placeholder("float",[None,n_classses])
+x = tf.placeholder("float", [None, n_input])
+y = tf.placeholder("float", [None, n_classses])
 
 def multilayer_perceptron(_X,_weights,_biases):
     layer1 = tf.nn.sigmoid(tf.add(tf.matmul(_X, _weights['h1']), _biases['b1']))

@@ -254,8 +254,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
     ###############
     # TRAIN MODEL #
     ###############
-    print
-    '... training'
+    print('... training')
     # early-stopping parameters
     patience = 10000  # look as this many examples regardless
     patience_increase = 2  # wait this much longer when a new best is
@@ -278,7 +277,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
 
     while (epoch < n_epochs) and (not done_looping):
         epoch = epoch + 1
-        for minibatch_index in xrange(n_train_batches):  # 每一批训练数据
+        for minibatch_index in range(n_train_batches):  # 每一批训练数据
 
             cost_ij = train_model(minibatch_index)
             iter = (epoch - 1) * n_train_batches + minibatch_index
@@ -286,7 +285,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
 
                 # compute zero-one loss on validation set
                 validation_losses = [validate_model(i) for i
-                                     in xrange(n_valid_batches)]
+                                     in range(n_valid_batches)]
                 this_validation_loss = numpy.mean(validation_losses)
                 print('epoch %i, minibatch %i/%i, validation error %f %%' %
                       (epoch, minibatch_index + 1, n_train_batches,
@@ -307,7 +306,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
                     # test it on the test set
                     test_losses = [
                         test_model(i)
-                        for i in xrange(n_test_batches)
+                        for i in range(n_test_batches)
                         ]
                     test_score = numpy.mean(test_losses)
                     print(('     epoch %i, minibatch %i/%i, test error of '
@@ -324,7 +323,7 @@ def evaluate_lenet5(learning_rate=0.1, n_epochs=200,
     print('Best validation score of %f %% obtained at iteration %i, '
           'with test performance %f %%' %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
-    print >> sys.stderr, ('The code for file ' +
+    print>> sys.stderr, ('The code for file ' +
                           os.path.split(__file__)[1] +
                           ' ran for %.2fm' % ((end_time - start_time) / 60.))
 

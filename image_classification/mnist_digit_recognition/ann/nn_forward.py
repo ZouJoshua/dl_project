@@ -2,9 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 11/18/19 10:54 PM
+@Time    : 12/2/19 8:19 PM
 @File    : nn_forward.py
-@Desc    : 前向传播
+@Desc    : 单层正向传播
+
+"""
+
+"""
+网络结构：
+输入层 -> 输出层
+input[None,784] -> softmax[None,10]
 
 """
 
@@ -14,7 +21,7 @@ import tensorflow as tf
 
 INPUT_NODE = 784
 OUTPUT_NODE = 10
-LAYER1_NODE = 500
+
 
 
 def get_weight(shape, regularizer):
@@ -30,13 +37,8 @@ def get_bias(shape):
 
 
 def forward(x, regularizer):
-    w1 = get_weight([INPUT_NODE, LAYER1_NODE], regularizer)
-    b1 = get_bias([LAYER1_NODE])
-    y1 = tf.nn.relu(tf.matmul(x, w1) + b1)
-
-    w2 = get_weight([LAYER1_NODE, OUTPUT_NODE], regularizer)
-    b2 = get_bias([OUTPUT_NODE])
-
-    y = tf.matmul(y1, w2) + b2
+    w1 = get_weight([INPUT_NODE, OUTPUT_NODE], regularizer)
+    b1 = get_bias([OUTPUT_NODE])
+    y = tf.nn.softmax(tf.matmul(x, w1) + b1)
 
     return y

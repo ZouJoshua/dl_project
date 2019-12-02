@@ -12,7 +12,8 @@
 
 import tensorflow as tf
 import data.input_data as input_data
-mnist = input_data.read_data_sets("MNIST/",one_hot=True)
+
+mnist = input_data.read_data_sets("MNIST/", one_hot=True)
 #Paramters
 learning_rate = 0.001
 training_iters = 100000

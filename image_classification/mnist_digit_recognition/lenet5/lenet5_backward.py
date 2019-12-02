@@ -12,7 +12,7 @@ import tensorflow as tf
 import numpy as np
 import os
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition import lenet5_forward
+from image_classification.mnist_digit_recognition.lenet5 import lenet5_forward
 
 BATCH_SIZE = 100
 LEARNING_RATE_BASE = 0.005
