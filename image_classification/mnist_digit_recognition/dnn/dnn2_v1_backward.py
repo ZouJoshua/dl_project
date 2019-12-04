@@ -12,16 +12,19 @@
 """
 网络结构：
 输入层 -> 隐藏层1（256神经元） -> 隐藏层2(256神经元) -> 输出层
+Input:
+input[None,784]
 Layer1:
-input[None,784] -> sigmoid[784, 256]
+sigmoid[784, 256]
 Layer2:
-relu[256,256] -> softmax[256,10]
-
+relu[256,256] 
+Output:
+softmax[256,10] -> out[None, 10]
 """
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition.dnn import dnn1_forward
+from image_classification.mnist_digit_recognition.dnn import dnn2_v1_forward
 import os
 
 
@@ -32,7 +35,7 @@ REGULARIZER = 0.0001
 STEPS = 50000
 MOVING_AVERAGE_DECAY = 0.99
 LOG_PATH = "/data/work/dl_project/logs/mnist"
-MODEL_SAVE_PATH = "./model_dnn1/"
+MODEL_SAVE_PATH = "./model_dnn2_v1/"
 MODEL_NAME = "mnist_model"
 train_num_examples = 60000  # mnist.train.num_examples
 
@@ -41,11 +44,12 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def backward(mnist):
-    x = tf.placeholder(tf.float32, [None, dnn1_forward.INPUT_NODE])
-    y_ = tf.placeholder(tf.float32, [None, dnn1_forward.OUTPUT_NODE])
-    y = dnn1_forward.forward(x, REGULARIZER)
+    x = tf.placeholder(tf.float32, [None, dnn2_v1_forward.INPUT_NODE])
+    y_ = tf.placeholder(tf.float32, [None, dnn2_v1_forward.OUTPUT_NODE])
+    y = dnn2_v1_forward.forward(x, REGULARIZER)
     global_step = tf.Variable(0, trainable=False)
 
+    # 用于避免log(0)值为Nan造成数据不稳定, 传入数据为不做softmax的数据
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=y, labels=tf.argmax(y_, 1))
     cem = tf.reduce_mean(ce)
     loss = cem + tf.add_n(tf.get_collection("losses"))

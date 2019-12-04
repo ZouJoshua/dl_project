@@ -11,8 +11,8 @@
 """
 网络结构：
 输入层 -> 输出层
-input[None,784] -> softmax[None,10]
-
+Layer1:
+input[None,784] -> softmax[784,10] -> out[None, 10]
 """
 
 

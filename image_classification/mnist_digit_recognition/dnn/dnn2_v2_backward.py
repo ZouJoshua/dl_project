@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 11:13 PM
-@File    : dnn_backward.py
+@File    : dnn2_v2_backward.py
 @Desc    : 双隐藏层反向传播过程
 
 """
@@ -12,16 +12,20 @@
 """
 网络结构：
 输入层 -> 隐藏层1（600神经元） -> 隐藏层2(480神经元) -> 输出层
+Input:
+input[None,784]
 Layer1:
-input[None,784] -> relu[784, 600] -> dropout[600, 480]
+relu[784, 600] -> dropout[784, 600]
 Layer2:
-relu[600,480] -> dropout[480, 10] -> softmax[None,10]
+relu[600,480] -> dropout[600,480] 
+Output:
+softmax[480,10] -> out[None, 10]
 
 """
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition.dnn import dnn_forward
+from image_classification.mnist_digit_recognition.dnn import dnn2_v2_forward
 import os
 
 
@@ -42,9 +46,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def backward(mnist):
-    x = tf.placeholder(tf.float32, [None, dnn_forward.INPUT_NODE])
-    y_ = tf.placeholder(tf.float32, [None, dnn_forward.OUTPUT_NODE])
-    y = dnn_forward.forward(x, REGULARIZER, KEEP_PROB)
+    x = tf.placeholder(tf.float32, [None, dnn2_v2_forward.INPUT_NODE])
+    y_ = tf.placeholder(tf.float32, [None, dnn2_v2_forward.OUTPUT_NODE])
+    y = dnn2_v2_forward.forward(x, REGULARIZER, KEEP_PROB)
     global_step = tf.Variable(0, trainable=False)
 
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=y, labels=tf.argmax(y_, 1))

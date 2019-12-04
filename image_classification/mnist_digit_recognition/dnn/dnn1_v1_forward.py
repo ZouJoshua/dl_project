@@ -3,24 +3,26 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 10:54 PM
-@File    : nn_forward.py
-@Desc    : 单隐藏层500结点前向传播
+@File    : dnn1_v1_forward.py
+@Desc    : 单隐藏层前向传播
 
 """
-
-
-import tensorflow as tf
 
 
 """
 网络结构：
 输入层 -> 隐藏层1（500神经元） -> 输出层
+Input:
+input[None,784]
 Layer1:
-input[None,784] -> relu[784, 500] -> relu[784, 500]
-Layer2:
-[500,10] -> softmax[None,10]
+relu[784, 500] -> relu[784, 500]
+Output:
+softmax[500,10] -> out[None, 10]
 
 """
+
+import tensorflow as tf
+
 
 INPUT_NODE = 784
 OUTPUT_NODE = 10

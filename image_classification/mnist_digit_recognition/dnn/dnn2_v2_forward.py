@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 10:54 PM
-@File    : dnn_forward.py
+@File    : dnn2_v2_forward.py
 @Desc    : 双隐藏层前向传播
 
 """
@@ -15,10 +15,14 @@ import tensorflow as tf
 """
 网络结构：
 输入层 -> 隐藏层1（600神经元） -> 隐藏层2(480神经元) -> 输出层
+Input:
+input[None,784]
 Layer1:
-input[None,784] -> relu[784, 600] -> dropout[600, 480]
+relu[784, 600] -> dropout[784, 600]
 Layer2:
-relu[600,480] -> dropout[480, 10] -> softmax[None,10]
+relu[600,480] -> dropout[600,480] 
+Output:
+softmax[480,10] -> out[None, 10]
 
 """
 

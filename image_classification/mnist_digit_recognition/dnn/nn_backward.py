@@ -13,12 +13,12 @@
 网络结构：
 输入层 -> 输出层
 Layer1:
-input[None,784] -> softmax[None,10]
+input[None,784] -> softmax[784,10] -> out[None, 10]
 """
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition.ann import nn_forward
+from image_classification.mnist_digit_recognition.dnn import nn_forward
 import os
 
 

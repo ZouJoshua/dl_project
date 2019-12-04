@@ -3,8 +3,8 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 11:13 PM
-@File    : nn_backward.py
-@Desc    : 单隐藏层500结点反向传播过程
+@File    : dnn1_v1_backward.py
+@Desc    : 单隐藏层反向传播过程
 
 """
 
@@ -12,16 +12,18 @@
 """
 网络结构：
 输入层 -> 隐藏层1（500神经元） -> 输出层
+Input:
+input[None,784]
 Layer1:
-input[None,784] -> relu[784, 500] -> relu[784, 500]
-Layer2:
-[500,10] -> softmax[None,10]
+relu[784, 500] -> relu[784, 500]
+Output:
+softmax[500,10] -> out[None, 10]
 
 """
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition.ann import nn500_forward
+from image_classification.mnist_digit_recognition.dnn import dnn1_v1_forward
 import os
 
 
@@ -32,7 +34,7 @@ REGULARIZER = 0.0001
 STEPS = 50000
 MOVING_AVERAGE_DECAY = 0.99
 LOG_PATH = "/data/work/dl_project/logs/mnist"
-MODEL_SAVE_PATH = "./model_nn500/"
+MODEL_SAVE_PATH = "./model_dnn1/"
 MODEL_NAME = "mnist_model"
 train_num_examples = 60000  # mnist.train.num_examples
 
@@ -41,9 +43,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def backward(mnist):
-    x = tf.placeholder(tf.float32, [None, nn500_forward.INPUT_NODE])
-    y_ = tf.placeholder(tf.float32, [None, nn500_forward.OUTPUT_NODE])
-    y = nn500_forward.forward(x, REGULARIZER)
+    x = tf.placeholder(tf.float32, [None, dnn1_v1_forward.INPUT_NODE])
+    y_ = tf.placeholder(tf.float32, [None, dnn1_v1_forward.OUTPUT_NODE])
+    y = dnn1_v1_forward.forward(x, REGULARIZER)
     global_step = tf.Variable(0, trainable=False)
 
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=y, labels=tf.argmax(y_, 1))

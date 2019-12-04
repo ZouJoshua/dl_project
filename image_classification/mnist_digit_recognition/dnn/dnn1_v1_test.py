@@ -3,8 +3,8 @@
 """
 @Author  : Joshua
 @Time    : 11/18/19 11:41 PM
-@File    : nn500_test.py
-@Desc    : nn500_forward nn500_backward 测试
+@File    : dnn1_v1_test.py
+@Desc    : 测试
 
 """
 
@@ -12,7 +12,7 @@ import time
 import tensorflow as tf
 import os
 from tensorflow.examples.tutorials.mnist import input_data
-from image_classification.mnist_digit_recognition.ann import nn500_backward, nn500_forward
+from image_classification.mnist_digit_recognition.dnn import dnn1_v1_backward, dnn1_v1_forward
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
@@ -20,12 +20,12 @@ TEST_INTERVAL_SECS = 5
 
 def nn_test(mnist):
     with tf.Graph().as_default() as g:
-        x = tf.placeholder(tf.float32, [None, nn500_forward.INPUT_NODE])
-        y_ = tf.placeholder(tf.float32, [None, nn500_forward.OUTPUT_NODE])
+        x = tf.placeholder(tf.float32, [None, dnn1_v1_forward.INPUT_NODE])
+        y_ = tf.placeholder(tf.float32, [None, dnn1_v1_forward.OUTPUT_NODE])
 
-        y = nn500_forward.forward(x, None)
+        y = dnn1_v1_forward.forward(x, None)
 
-        ema = tf.train.ExponentialMovingAverage(nn500_backward.MOVING_AVERAGE_DECAY)
+        ema = tf.train.ExponentialMovingAverage(dnn1_v1_backward.MOVING_AVERAGE_DECAY)
         ema_restore = ema.variables_to_restore()
         saver = tf.train.Saver(ema_restore)
 
@@ -38,7 +38,7 @@ def nn_test(mnist):
 
         while True:
             with tf.Session(config=gpu_config) as sess:
-                ckpt = tf.train.get_checkpoint_state(nn500_backward.MODEL_SAVE_PATH)
+                ckpt = tf.train.get_checkpoint_state(dnn1_v1_backward.MODEL_SAVE_PATH)
                 if ckpt and ckpt.model_checkpoint_path:
                     saver.restore(sess, ckpt.model_checkpoint_path)
                     global_step = ckpt.model_checkpoint_path.split("/")[-1].split('-')[-1]

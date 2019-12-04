@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 11/19/19 12:24 AM
-@File    : nn_app.py
+@File    : dnn1_v1_app.py
 @Desc    : 预测应用
 
 """
@@ -12,21 +12,21 @@
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-from image_classification.mnist_digit_recognition.ann import nn_backward, nn_forward
+from image_classification.mnist_digit_recognition.dnn import dnn1_v1_forward, dnn1_v1_backward
 
 
 def restore_model(testPicArr):
     with tf.Graph().as_default() as tg:
-        x = tf.placeholder(tf.float32, [None, nn_forward.INPUT_NODE])
-        y = nn_forward.forward(x, None)
+        x = tf.placeholder(tf.float32, [None, dnn1_v1_forward.INPUT_NODE])
+        y = dnn1_v1_forward.forward(x, None)
 
         preValue = tf.argmax(y, 1)
-        variable_average = tf.train.ExponentialMovingAverage(nn_backward.MOVING_AVERAGE_DECAY)
+        variable_average = tf.train.ExponentialMovingAverage(dnn1_v1_backward.MOVING_AVERAGE_DECAY)
         variable_to_restore = variable_average.variables_to_restore()
         saver = tf.train.Saver(variable_to_restore)
 
         with tf.Session() as sess:
-            ckpt = tf.train.get_checkpoint_state(nn_backward.MODEL_SAVE_PATH)
+            ckpt = tf.train.get_checkpoint_state(dnn1_v1_backward.MODEL_SAVE_PATH)
             if ckpt and ckpt.model_checkpoint_path:
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 preValue = sess.run(preValue, feed_dict={x: testPicArr})
