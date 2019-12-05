@@ -57,6 +57,7 @@ def bachword():
         for i in range(STEPS):
             start = (BATCH_SIZE*i) % N
             end = start + BATCH_SIZE
-            sess.run(train_step, feed_dict={x: x[start:end],y_: y[start:end]})
+            # sess.run(train_step, feed_dict={x: x[start:end],y_: y[start:end]})
+            sess.run(train_op, feed_dict={x: x[start:end],y_: y[start:end]})
             if i % 300 == 0:
                 print("")
