@@ -380,3 +380,6 @@ def clean_to_list(text):
     text = re.sub(r"\s{2,}", " ", text)
     text = text.split()
     return text
+
+
+

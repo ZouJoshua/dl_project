@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 19-8-22 下午12:16
-@File    : crf_tagger.py
+@File    : ner_with_crf.py
 @Desc    : 
 """
 
