@@ -1,5 +1,5 @@
 selenium==3.141.0
-tensorflow==1.13.1
+tensorflow==1.15.0
 tflearn==0.3.2
 PyQuery==1.4.0
 pandas==0.24.2
