@@ -1,0 +1,23 @@
+{
+    "auto": "汽车",
+    "sports": "体育",
+    "sport": "体育",
+    "2008": "体育",
+    "edu": "教育",
+    "finance": "财经",
+    "money": "财经",
+    "caifu": "财经",
+    "ent": "娱乐",
+    "health": "健康",
+    "tech": "科技",
+    "military": "军事",
+    "war": "军事",
+    "mil": "军事",
+    "house": "房产",
+    "soufun": "房产",
+    "fun": "世界",
+    "lady": "女性",
+    "eladies": "女性",
+    "cul": "文化",
+    "culture": "文化"
+}

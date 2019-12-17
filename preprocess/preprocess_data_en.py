@@ -113,22 +113,23 @@ class SplitData2tsv(object):
         skf = StratifiedKFold(n_splits=int(1/valid_portion))
         i = 0
         for train_index, test_index in skf.split(x, y):
+            train_label_id_count = self._label_count([y[i] for i in train_index])
+            test_label_id_count = self._label_count([y[j] for j in test_index])
+            # train_label_count = dict()
+            # test_label_count = dict()
+            # for cat, count in train_label_id_count.items():
+            #     train_label_count[cat] = count
+            # for cat, count in test_label_id_count.items():
+            #     test_label_count[cat] = count
+            print("train_label_count: {}".format(json.dumps(train_label_id_count, indent=4)))
+            print("test_label_count: {}".format(json.dumps(test_label_id_count, indent=4)))
+            train = [str(self.label2index[y[i]]) + "\t" + x[i] for i in train_index]
+            dev = [str(self.label2index[y[j]]) + "\t" + x[j] for j in test_index]
             i += 1
             if i < 2:
-                train_label_id_count = self._label_count([y[i] for i in train_index])
-                test_label_id_count = self._label_count([y[j] for j in test_index])
-                train_label_count = dict()
-                test_label_count = dict()
-                for cat, count in train_label_id_count.items():
-                    train_label_count[cat] = count
-                for cat, count in test_label_id_count.items():
-                    test_label_count[cat] = count
-                print("train_label_count: {}".format(json.dumps(train_label_count, indent=4)))
-                print("test_label_count: {}".format(json.dumps(test_label_count, indent=4)))
-                train = [str(self.label2index[y[i]]) + "\t" + x[i] for i in train_index]
-                dev = [str(self.label2index[y[j]]) + "\t" + x[j] for j in test_index]
+                break
 
-                return train, dev
+            return train, dev
 
     def _label_count(self, label_list):
         label_count = dict()

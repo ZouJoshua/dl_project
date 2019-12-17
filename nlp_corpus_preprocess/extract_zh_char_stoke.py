@@ -8,7 +8,7 @@
 
 """
 
-from corpus_process.Stoke.character_stoke_handian import Stoke
+from nlp_corpus_preprocess.Stoke.character_stoke_handian import Stoke
 import sys
 import os
 from optparse import OptionParser

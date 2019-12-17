@@ -22,7 +22,7 @@ sys.path.append(root_dir)
 import warnings
 warnings.filterwarnings('ignore')
 
-from tf_model.textrcnn_model import TextRCNN
+from model_tensorflow.textrcnn_model import TextRCNN
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 from preprocess.preprocess_data_taste import DataSet

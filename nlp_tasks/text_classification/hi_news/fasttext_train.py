@@ -21,7 +21,7 @@ sys.path.append(root_dir)
 import warnings
 warnings.filterwarnings('ignore')
 
-from tf_model.fasttext_model import FastText
+from model_tensorflow.fasttext_model import FastText
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
 from gensim.models import KeyedVectors

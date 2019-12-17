@@ -9,7 +9,7 @@
 """
 
 
-from ba_seq_label.knowledge_graph.stoke.handian import Handian
+from nlp_tasks.knowledge_graph.stoke.handian import Handian
 import urllib.request as urllib2
 import urllib
 from bs4 import BeautifulSoup
