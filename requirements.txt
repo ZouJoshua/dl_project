@@ -14,3 +14,4 @@ nltk==3.4.4
 gensim==3.4.0
 fasttext==0.8.3
 python-crfsuite==0.9.6
+wordcloud==1.6.0

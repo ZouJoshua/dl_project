@@ -19,35 +19,69 @@ from string import punctuation
 from setting import DATA_PATH
 from preprocess.preprocess_tools import read_json_format_file
 
-def listdir(path, list_name):
-    """
-    生成原始语料文件夹下文件列表
-    :param path:
-    :param list_name:
-    :return:
-    """
-    for file in os.listdir(path):
-        file_path = os.path.join(path, file)
-        if os.path.isdir(file_path):
-                listdir(file_path, list_name)
-        else:
-                list_name.append(file_path)
 
-def extract_docs(file_dir, outfile):
-    """
-    抽取文本内容到文件
-    :return:
-    """
-    # 字符数小于这个数目的content将不被保存
-    threh = 30
-    # 获取所有语料
-    list_name = list()
-    listdir(file_dir, list_name)
-    i = 0
-    for path in list_name:
-        print(path)
-        with open(path, 'rb') as f, open(outfile, "a+", encoding="utf-8") as o_f:
-            text = f.read().decode("gbk", "ignore")
+class PreCorpus(object):
+
+    def __init__(self, ori_file_dir, output_path, is_xml_file=None):
+        self.corpus_file = os.path.join(output_path, "sogou_corpus")
+        self.corpus_file_with_label = os.path.join(output_path, "sogou_corpus_with_label")
+        self.url_file_without_label = os.path.join(output_path, "url_without_label")
+        self.domain_count_file = os.path.join(output_path, "url_domain_count.txt")
+        self.label_count_file = os.path.join(output_path, "url_label_count.txt")
+        if not os.path.exists(self.corpus_file):
+            if is_xml_file:
+                ori_file = os.path.join(ori_file_dir, "news_sohusite_xml.dat")
+                if os.path.exists(ori_file):
+                    self.extract_docs_from_xml_file(ori_file, self.corpus_file)
+                else:
+                    raise Exception("Ori_file {} not found".format("news_sohusite_xml.dat"))
+            else:
+                self.extract_docs(ori_file_dir, self.corpus_file)
+        else:
+            print("Find corpus file in {}".format(self.corpus_file))
+
+        if not os.path.exists(self.corpus_file_with_label):
+            self.analysis_url(self.corpus_file, self.domain_count_file, self.label_count_file)
+
+
+
+    def listdir(self, path, list_name):
+        """
+        生成原始语料文件夹下文件列表
+        :param path:
+        :param list_name:
+        :return:
+        """
+        for file in os.listdir(path):
+            file_path = os.path.join(path, file)
+            if os.path.isdir(file_path):
+                    self.listdir(file_path, list_name)
+            else:
+                    list_name.append(file_path)
+
+    def extract_docs(self, file_dir, outfile):
+        """
+        抽取文本内容到文件
+        :return:
+        """
+        # 获取所有语料
+        list_name = list()
+        self.listdir(file_dir, list_name)
+        i = 0
+        for path in list_name:
+            print(path)
+            self.extract_docs_from_xml_file(path, outfile)
+
+            # i += 1
+            # if i == 1:
+            #     break
+
+
+    def extract_docs_from_xml_file(self, xml_file, outfile):
+        # 字符数小于这个数目的content将不被保存
+        threh = 30
+        with open(xml_file, 'rb') as f, open(outfile, "a+", encoding="utf-8") as o_f:
+            text = f.read().decode("gb18030", "ignore")
             # print(text)
             pattern_doc = re.compile(r'<doc>(.*?)</doc>', re.S)
 
@@ -66,103 +100,100 @@ def extract_docs(file_dir, outfile):
                 out["url"] = url.group(1) if url else ""
                 # 把所有内容小于30字符的文本全部过滤掉
                 if len(content[0]) >= threh:
-                    o_f.write(json.dumps(out, ensure_ascii=False)+"\n")
+                    o_f.write(json.dumps(out, ensure_ascii=False) + "\n")
                 else:
                     continue
-        # i += 1
-        # if i == 1:
-        #     break
 
-def extract_label(netloc, url2label_dict):
-    """
-    从url链接抽取label
-    :param netloc:
-    :param url2label_dict:
-    :return:
-    """
-    labels = netloc.split(".")
-    label = ""
-    if netloc == "news.china.com":
-        label = "社会"
-    for la in labels:
-        if la in url2label_dict:
-            label = url2label_dict[la]
-
-    return label
-
-
-def analysis_url(file, outfile1, outfile2):
-    """
-    分析url,查看可提供的label
-    :param file:
-    :param outfile1:
-    :param outfile2:
-    :return:
-    """
-    lines = read_json_format_file(file)
-    scheme_dict = dict()
-    domain_dict = dict()
-    label_dict = dict()
-    for line in lines:
-        url = line["url"]
-        url_parse = urlparse(url)
-        scheme = url_parse.scheme
-        if scheme not in scheme_dict:
-            scheme_dict[scheme] = 1
-        else:
-            scheme_dict[scheme] += 1
-        netloc = url_parse.netloc
-        if netloc not in domain_dict:
-            domain_dict[netloc] = 1
-        else:
-            domain_dict[netloc] += 1
+    def extract_label(self, netloc, url2label_dict):
+        """
+        从url链接抽取label
+        :param netloc:
+        :param url2label_dict:
+        :return:
+        """
         labels = netloc.split(".")
-        for label in labels:
-            if label not in label_dict:
-                label_dict[label] = 1
-            else:
-                label_dict[label] += 1
+        label = ""
+        if netloc == "news.china.com":
+            label = "社会"
+        for la in labels:
+            if la in url2label_dict:
+                label = url2label_dict[la]
 
-    print(scheme_dict)
-    print(domain_dict)
-    print(label_dict)
-    with open(outfile1, "w") as f:
-        f.writelines(json.dumps(domain_dict, indent=4))
-    with open(outfile2, "w") as f:
-        f.writelines(json.dumps(label_dict, indent=4))
+        return label
 
 
-
-def pre_corpus(ori_file, label_file, corpus_file, url_file):
-    """
-    将语料处理为带label
-    :param ori_file:
-    :param label_file:
-    :param corpus_file:
-    :param url_file:
-    :return:
-    """
-    lines = read_json_format_file(ori_file)
-    with open(label_file, "r", encoding="utf-8") as f:
-        url2label_dict = json.load(f)
-    labels = dict()
-    with open(corpus_file, "w", encoding="utf-8") as cf, open(url_file, "w", encoding="utf-8") as uf:
+    def analysis_url(self, file, outfile1, outfile2):
+        """
+        分析url,查看可提供的label
+        :param file:
+        :param outfile1:
+        :param outfile2:
+        :return:
+        """
+        lines = read_json_format_file(file)
+        scheme_dict = dict()
+        domain_dict = dict()
+        label_dict = dict()
         for line in lines:
             url = line["url"]
             url_parse = urlparse(url)
-            netloc = url_parse.netloc
-            label = extract_label(netloc, url2label_dict)
-            line["category"] = label
-            if label != "":
-                cf.write(json.dumps(line, ensure_ascii=False) + "\n")
-                if label not in labels:
-                    labels[label] = 1
-                else:
-                    labels[label] += 1
+            scheme = url_parse.scheme
+            if scheme not in scheme_dict:
+                scheme_dict[scheme] = 1
             else:
-                uf.write(url+"\n")
-            del url
-        print(labels)
+                scheme_dict[scheme] += 1
+            netloc = url_parse.netloc
+            if netloc not in domain_dict:
+                domain_dict[netloc] = 1
+            else:
+                domain_dict[netloc] += 1
+            labels = netloc.split(".")
+            for label in labels:
+                if label not in label_dict:
+                    label_dict[label] = 1
+                else:
+                    label_dict[label] += 1
+
+        print(scheme_dict)
+        print(domain_dict)
+        print(label_dict)
+        with open(outfile1, "w") as f:
+            f.writelines(json.dumps(domain_dict, indent=4))
+        with open(outfile2, "w") as f:
+            f.writelines(json.dumps(label_dict, indent=4))
+
+
+
+    def pre_corpus(self, ori_file, label_file, corpus_file, url_file):
+        """
+        将语料处理为带label
+        :param ori_file:
+        :param label_file:
+        :param corpus_file:
+        :param url_file:
+        :return:
+        """
+        lines = read_json_format_file(ori_file)
+        with open(label_file, "r", encoding="utf-8") as f:
+            url2label_dict = json.load(f)
+        labels = dict()
+        with open(corpus_file, "w", encoding="utf-8") as cf, open(url_file, "w", encoding="utf-8") as uf:
+            for line in lines:
+                url = line["url"]
+                url_parse = urlparse(url)
+                netloc = url_parse.netloc
+                label = self.extract_label(netloc, url2label_dict)
+                line["category"] = label
+                if label != "":
+                    cf.write(json.dumps(line, ensure_ascii=False) + "\n")
+                    if label not in labels:
+                        labels[label] = 1
+                    else:
+                        labels[label] += 1
+                else:
+                    uf.write(url+"\n")
+                del url
+            print(labels)
 
 
 
@@ -275,17 +306,14 @@ class SplitData2tsv(object):
 def main():
     ori_file_dir = "/data/common/sogou_data"
     data_path = os.path.join(DATA_PATH, "sogou")
-    outfile = os.path.join(data_path, "sogou_corpus")
-    outfile1 = os.path.join(data_path, "sogou_corpus_with_label")
-    outfile2 = os.path.join(data_path, "url_without_label")
-    domain_count_file = os.path.join(data_path, "domain_count.txt")
-    label_count_file = os.path.join(data_path, "label_count.txt")
+    PreCorpus(ori_file_dir, data_path, is_xml_file=True)
     label_file = os.path.join(data_path, "url2label.txt")
     # extract_docs(ori_file_dir, outfile)
+    # extract_docs_from_xml_file(xml_file, outfile)
     # extract_label(outfile)
     # analysis_url(outfile, domain_count_file, label_count_file)
     # pre_corpus(outfile, label_file, outfile1, outfile2)
-    SplitData2tsv(outfile1, data_path)
+    # SplitData2tsv(outfile1, data_path)
 
 
 

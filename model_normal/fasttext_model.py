@@ -57,10 +57,8 @@ class FastTextClassifier:
         """
         训练:参数可以针对性修改,进行调优
         """
-        args_dict = self.get_train_args(section="fasttext.args")
-        model = fasttext.supervised(self.train_path,
-                                    self.model_path,
-                                    **args_dict)
+        args_dict = self.get_train_args(section=self.args_section)
+        model = fasttext.train_supervised(**args_dict)
 
         train_result = model.test(self.train_path)
         self.log.info('训练集准确率： {}'.format(train_result.precision))
@@ -76,9 +74,11 @@ class FastTextClassifier:
         args_list = config.options(section)
         self.log.info("配置文件参数列表：{}".format(args_list))
         args_dict = dict()
-        args_dict["label_prefix"] = config.get(section, "label_prefix")
+        args_dict["input"] = self.train_path
+        # args_dict["model"] = config.get(section, "model")
+        args_dict["label"] = config.get(section, "label")
         args_dict["epoch"] = config.getint(section, "epoch")
-        args_dict["silent"] = config.getboolean(section, "silent")
+        # args_dict["silent"] = config.getboolean(section, "silent")
         args_dict["lr"] = config.getfloat(section, "lr")
         args_dict["minn"] = config.getint(section, "minn")
         args_dict["maxn"] = config.getint(section, "maxn")
@@ -111,7 +111,7 @@ class FastTextClassifier:
         :return:
         """
         if os.path.exists(self.model_path + '.bin'):
-            return fasttext.load_model(model_path + '.bin', label_prefix='__label__')
+            return fasttext.load_model(model_path + '.bin')
         else:
             return None
 
