@@ -9,7 +9,7 @@
 
 import json
 from nltk.corpus import stopwords
-from preprocess.preprocess_tools import CleanDoc, read_json_format_file, dict_sort
+from nlp_corpus_preprocess.preprocess_tools import CleanDoc, read_json_format_file, dict_sort
 import os
 from model_normal.fasttext_model import FastTextClassifier
 from evaluate.eval_calculate import EvaluateModel

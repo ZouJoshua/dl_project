@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 12/10/19 7:28 PM
-@File    : character_stoke.py
+@File    : character_stroke.py
 @Desc    : 
 
 """
@@ -21,9 +21,8 @@ if sys.getdefaultencoding() != defaultencoding:
     sys.setdefaultencoding(defaultencoding)
 
 
-class Stoke(object):
-    # dictionary_filepath = "./default_stoke.txt"
-    dictionary_filepath = "./Stoke/default_stoke.txt"
+class Stroke(object):
+    dictionary_filepath = "./default_stroke.txt"
     # baiduhanyu_url = 'http://hanyu.baidu.com/zici/s?ptype=zici&wd=%s'
     hanzi5_url = "http://www.hanzi5.com/bishun/%s.html"
 
@@ -57,13 +56,13 @@ class Stoke(object):
         # print(html)
         if html is None:
             return None
-        char_stoke = self.anlysis_stoke_from_html(html)
+        char_stoke = self.anlysis_stroke_from_html(html)
         if char_stoke is not None:
             self.dictionary[word] = char_stoke
         # print("char_stoke {}".format(char_stoke))
         return char_stoke
 
-    def anlysis_stoke_from_html(self, html_doc):
+    def anlysis_stroke_from_html(self, html_doc):
         soup = BeautifulSoup(html_doc, 'html.parser')
         li = soup.find("div", {"class", "site-article-content hanzi5-article-hanzi-info"})
         for tabb in li.findAll('table'):
@@ -94,7 +93,7 @@ class Stoke(object):
 if __name__ == "__main__":
     print("extract character stoke from [http://www.hanzi5.com/bishun/]")
 
-    stoke = Stoke()
+    stoke = Stroke()
     print("中", stoke.get_stoke("中"))
     print("王", stoke.get_stoke("王"))
     print("像", stoke.get_stoke("像"))

@@ -15,7 +15,7 @@ import progressbar
 import string
 import sys
 
-from nlp_tasks.knowledge_graph.stoke.character_stroke_handian import Stoke
+from nlp_tasks.knowledge_graph.stroke.character_stroke_handian import Stroke
 from cnradical import Radical, RunOption
 from pypinyin import lazy_pinyin
 

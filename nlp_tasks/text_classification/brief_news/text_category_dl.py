@@ -13,20 +13,28 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
-import sys
-
+import os
 import numpy as np
-import pandas
+import pandas as pd
 from sklearn import metrics
+from sklearn.metrics import accuracy_score, precision_score, classification_report
 import tensorflow as tf
-from nlp_tasks.text_classification.brief_news.preprocess import DataSet
 from tensorflow.contrib.layers.python.layers import encoders
+
+import pickle
+from nlp_tasks.text_classification.brief_news.preprocess import DataSet, dump_data
 from setting import DATA_PATH
+
+# import os
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 learn = tf.contrib.learn
 
 FLAGS = None
+
+# MAX_DOCUMENT_LENGTH = 15
+# MIN_WORD_FREQUENCE = 1
+# EMBEDDING_SIZE = 50
 
 # 文档最长长度
 MAX_DOCUMENT_LENGTH = 100
@@ -65,7 +73,7 @@ def cnn_model(features, target):
     word_vectors = tf.expand_dims(word_vectors, 3)
     with tf.variable_scope('CNN_Layer1'):
         # 添加卷积层做滤波
-        conv1 = tf.contrib.layers.convolution2d(word_vectors, N_FILTERS, FILTER_SHAPE1, padding='VALID')
+        conv1 = tf.contrib.layers.conv2d(word_vectors, N_FILTERS, FILTER_SHAPE1, padding='VALID')
         # 添加RELU非线性
         conv1 = tf.nn.relu(conv1)
         # 最大池化
@@ -77,7 +85,7 @@ def cnn_model(features, target):
         pool1 = tf.transpose(pool1, [0, 1, 3, 2])
     with tf.variable_scope('CNN_Layer2'):
         # 第2个卷积层
-        conv2 = tf.contrib.layers.convolution2d(pool1,
+        conv2 = tf.contrib.layers.conv2d(pool1,
                                                 N_FILTERS,
                                                 FILTER_SHAPE2,
                                                 padding='VALID')
@@ -91,7 +99,7 @@ def cnn_model(features, target):
     train_op = tf.contrib.layers.optimize_loss(loss,
                                                tf.contrib.framework.get_global_step(),
                                                optimizer='Adam',
-                                               learning_rate=0.01)
+                                               learning_rate=0.001)
     return {'class': tf.argmax(logits, 1), 'prob': tf.nn.softmax(logits)}, loss, train_op
 
 
@@ -148,13 +156,26 @@ def bag_of_words_model(features, target):
 def train_cnn_model():
     global n_words
     # 处理词汇
+    # cat_list = ["car"]
     cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
-    ds = DataSet(DATA_PATH, cat_list)
-    # x, y = zip(*ds.data)
-    x_train = ds.x_train
-    y_train = ds.y_train
-    x_test = ds.x_test
-    y_test = ds.y_test
+
+    data_path = os.path.join(DATA_PATH, "brief_news")
+    train_dump_file = os.path.join(data_path, "train.pkl")
+    test_dump_file = os.path.join(data_path, "test.pkl")
+    if os.path.exists(train_dump_file) and os.path.exists(test_dump_file):
+        with open(train_dump_file, 'rb') as file_train, open(test_dump_file, "rb") as file_test:
+            train_data = pickle.load(file_train)
+            test_data = pickle.load(file_test)
+    else:
+        ds = DataSet(DATA_PATH, cat_list)
+        # x, y = zip(*ds.data)
+        train_data = (ds.x_train, ds.y_train)
+        test_data = (ds.x_test, ds.y_test)
+        dump_data(train_data, train_dump_file)
+        dump_data(test_data, test_dump_file)
+
+    x_train, y_train = train_data
+    x_test, y_test = test_data
 
     vocab_processor = learn.preprocessing.VocabularyProcessor(MAX_DOCUMENT_LENGTH, min_frequency=MIN_WORD_FREQUENCE)
     x_train = np.array(list(vocab_processor.fit_transform(x_train)))
@@ -163,31 +184,47 @@ def train_cnn_model():
     print('Total words: %d' % n_words)
 
     cate_dic = {'technology': 1, 'car': 2, 'entertainment': 3, 'military': 4, 'sports': 5, 'finance': 6}
-    train_target = map(lambda x: cate_dic[x], y_train)
-    test_target = map(lambda x: cate_dic[x], y_test)
-    y_train = pandas.Series(train_target)
-    y_test = pandas.Series(test_target)
+    train_target = list(map(lambda x: cate_dic[x], y_train))
+    test_target = list(map(lambda x: cate_dic[x], y_test))
+    # print(x_train)
+    # print(train_target)
+    y_train = pd.Series(train_target)
+    y_test = pd.Series(test_target)
 
     # 构建模型
     classifier = learn.SKCompat(learn.Estimator(model_fn=cnn_model))
 
     # 训练和预测
-    classifier.fit(x_train, y_train, steps=1000)
+    classifier.fit(x_train, y_train, steps=100)
     y_predicted = classifier.predict(x_test)['class']
+    print(y_predicted)
     score = metrics.accuracy_score(y_test, y_predicted)
+    class_report = classification_report(y_test, y_predicted)
     print('Accuracy: {0:f}'.format(score))
+    print("classification report\n{}".format(class_report))
 
 
 def train_rnn_model():
     global n_words
     # 处理词汇
     cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
-    ds = DataSet(DATA_PATH, cat_list)
-    # x, y = zip(*ds.data)
-    x_train = ds.x_train
-    y_train = ds.y_train
-    x_test = ds.x_test
-    y_test = ds.y_test
+    data_path = os.path.join(DATA_PATH, "brief_news")
+    train_dump_file = os.path.join(data_path, "train.pkl")
+    test_dump_file = os.path.join(data_path, "test.pkl")
+    if os.path.exists(train_dump_file) and os.path.exists(test_dump_file):
+        with open(train_dump_file, 'rb') as file_train, open(test_dump_file, "rb") as file_test:
+            train_data = pickle.load(file_train)
+            test_data = pickle.load(file_test)
+    else:
+        ds = DataSet(DATA_PATH, cat_list)
+        # x, y = zip(*ds.data)
+        train_data = (ds.x_train, ds.y_train)
+        test_data = (ds.x_test, ds.y_test)
+        dump_data(train_data, train_dump_file)
+        dump_data(test_data, test_dump_file)
+
+    x_train, y_train = train_data
+    x_test, y_test = test_data
 
     vocab_processor = learn.preprocessing.VocabularyProcessor(MAX_DOCUMENT_LENGTH, min_frequency=MIN_WORD_FREQUENCE)
     x_train = np.array(list(vocab_processor.fit_transform(x_train)))
@@ -196,32 +233,44 @@ def train_rnn_model():
     print('Total words: %d' % n_words)
 
     cate_dic = {'technology': 1, 'car': 2, 'entertainment': 3, 'military': 4, 'sports': 5, 'finance': 6}
-    train_target = map(lambda x: cate_dic[x], y_train)
-    test_target = map(lambda x: cate_dic[x], y_test)
-    y_train = pandas.Series(train_target)
-    y_test = pandas.Series(test_target)
+    train_target = list(map(lambda x: cate_dic[x], y_train))
+    test_target = list(map(lambda x: cate_dic[x], y_test))
+    y_train = pd.Series(train_target)
+    y_test = pd.Series(test_target)
     model_fn = rnn_model
     classifier = learn.SKCompat(learn.Estimator(model_fn=model_fn))
 
     # Train and predict
-    classifier.fit(x_train, y_train, steps=1000)
+    classifier.fit(x_train, y_train, steps=100)
     y_predicted = classifier.predict(x_test)['class']
+
     score = metrics.accuracy_score(y_test, y_predicted)
+    class_report = classification_report(y_test, y_predicted)
     print('Accuracy: {0:f}'.format(score))
+    print("classification report\n{}".format(class_report))
 
 def train_bag_of_word_model():
-    MAX_DOCUMENT_LENGTH = 15
-    MIN_WORD_FREQUENCE = 1
-    EMBEDDING_SIZE = 50
     global n_words
     # 处理词汇
     cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
-    ds = DataSet(DATA_PATH, cat_list)
-    # x, y = zip(*ds.data)
-    x_train = ds.x_train
-    y_train = ds.y_train
-    x_test = ds.x_test
-    y_test = ds.y_test
+    data_path = os.path.join(DATA_PATH, "brief_news")
+    train_dump_file = os.path.join(data_path, "train.pkl")
+    test_dump_file = os.path.join(data_path, "test.pkl")
+
+    if os.path.exists(train_dump_file) and os.path.exists(test_dump_file):
+        with open(train_dump_file, 'rb') as file_train, open(test_dump_file, "rb") as file_test:
+            train_data = pickle.load(file_train)
+            test_data = pickle.load(file_test)
+    else:
+        ds = DataSet(DATA_PATH, cat_list)
+        # x, y = zip(*ds.data)
+        train_data = (ds.x_train, ds.y_train)
+        test_data = (ds.x_test, ds.y_test)
+        dump_data(train_data, train_dump_file)
+        dump_data(test_data, test_dump_file)
+
+    x_train, y_train = train_data
+    x_test, y_test = test_data
 
     # 处理词汇
     vocab_processor = learn.preprocessing.VocabularyProcessor(MAX_DOCUMENT_LENGTH, min_frequency=MIN_WORD_FREQUENCE)
@@ -243,3 +292,4 @@ def train_bag_of_word_model():
 if __name__ == "__main__":
     train_cnn_model()
     # train_rnn_model()
+    # train_bag_of_word_model()

@@ -15,7 +15,7 @@ import re
 import numpy as np
 import pickle
 import h5py
-from preprocess.preprocess_tools import read_json_format_file, CleanDoc, split_text
+from nlp_corpus_preprocess.preprocess_tools import read_json_format_file, CleanDoc, split_text
 from gensim.models import KeyedVectors
 from sklearn.model_selection import StratifiedKFold
 

@@ -13,7 +13,7 @@ import os
 import codecs
 import pandas as pd
 import pycrfsuite
-from ba_seq_label.knowledge_graph.crfsuite_model import sent2features
+from nlp_tasks.knowledge_graph.crfsuite_model import sent2features
 
 
 def write_format(file, id, label, start_end_pairs, entity):

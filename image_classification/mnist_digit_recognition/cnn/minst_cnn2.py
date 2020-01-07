@@ -22,7 +22,7 @@ Layer3：
 
 
 import tensorflow as tf
-from minst.data_processing import *
+from image_classification.mnist_digit_recognition.data_processing import *
 from numpy import outer
 
 #读取训练数据

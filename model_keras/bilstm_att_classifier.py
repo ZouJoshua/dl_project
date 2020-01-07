@@ -7,19 +7,13 @@
 @Desc    : 
 """
 
-
-
-import logging
-import os
-import time
 import pickle
 from collections import Counter
-import jieba
 
 from gensim.models import KeyedVectors
 from keras import Input, Model
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from keras.layers import Embedding, Bidirectional, LSTM, Dense, Dropout, GRU, BatchNormalization, CuDNNLSTM
+from keras.layers import Embedding, Bidirectional, LSTM, Dense, Dropout, BatchNormalization, CuDNNLSTM
 from keras_preprocessing.sequence import pad_sequences
 from sklearn.model_selection import train_test_split
 

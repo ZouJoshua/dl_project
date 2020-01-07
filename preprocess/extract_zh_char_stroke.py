@@ -3,18 +3,18 @@
 """
 @Author  : Joshua
 @Time    : 12/10/19 7:22 PM
-@File    : extract_zh_char_stoke.py
+@File    : extract_zh_char_stroke.py
 @Desc    : 抽取汉字笔画信息
 
 """
 
-from nlp_corpus_preprocess.Stoke.character_stoke_handian import Stoke
+from preprocess.Stroke.character_stroke_handian import Stroke
 import sys
 import os
 from optparse import OptionParser
 
 
-class Extract_stoke(object):
+class ExtractStroke(object):
     """
         Extract_stoke
     """
@@ -35,7 +35,7 @@ class Extract_stoke(object):
             os.remove(output_file_found_temp)
         print(output_file_found_temp)
         self.file_word = open(output_file_found_temp, encoding="UTF-8", mode="w")
-        self.stoke_opera = Stoke()
+        self.stoke_opera = Stroke()
         self.dict = {}
         self.stoke_dict = {}
         self.stoke_NoFound_dict = {}

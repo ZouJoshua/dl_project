@@ -11,7 +11,7 @@
 import json
 import time
 import fasttext
-from preprocess.preprocess_tools import read_json_format_file, CleanDoc
+from nlp_corpus_preprocess.preprocess_tools import read_json_format_file, CleanDoc
 
 
 def _preline(line_json):

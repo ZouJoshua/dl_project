@@ -2,30 +2,35 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 19-5-17 下午2:14
-@File    : preprocess_data_hi.py
-@Desc    : 
+@Time    : 19-6-21 上午11:01
+@File    : preprocess_data_game.py
+@Desc    : 游戏视频分类预处理
 """
 
 
+
+
 import os
-import time
+import re
 import pickle
 import json
-import random
+import string
 import numpy as np
 
 import h5py
 from sklearn.model_selection import StratifiedKFold
 from gensim.models import KeyedVectors
-from preprocess.preprocess_tools import read_json_format_file, split_text, get_ngrams, write_json_format_file
-
+from nlp_corpus_preprocess.preprocess_tools import read_json_format_file, split_text
+from nlp_corpus_preprocess.preprocess_tools import CleanDoc
 
 class DataSet(object):
 
-    def __init__(self, data_dir, word2vec_file, training_data_file=None, embedding_dims=300):
+    def __init__(self, data_dir, word2vec_file, training_data_file, embedding_dims=300):
         """
         数据预处理
+        step1 -> 创建word2vec词汇索引映射表
+        step2 ->
+
         :param data_dir: 数据资源目录
         :param word2vec_file: 预训练词向量文件
         :param training_data_file: 原始数据文件
@@ -33,8 +38,7 @@ class DataSet(object):
         """
         self.data_dir = data_dir
         self.word2vec_path = word2vec_file
-        if training_data_file:
-            self.raw_data_path = training_data_file
+        self.raw_data_path = training_data_file
         self.embedding = None
         self.embed_dim = embedding_dims
         self.word2index, self.index2word, self.word2embed = self.create_vocabulary(embedding_dims=self.embed_dim)
@@ -51,7 +55,6 @@ class DataSet(object):
         print("cache_path:", cache_path, "file_exists:", os.path.exists(cache_path))
 
         if os.path.exists(cache_path):  # 如果缓存文件存在，则直接读取
-            print("building vocabulary from cache file: {}".format(cache_path))
             with open(cache_path, 'rb') as data_f:
                 _word2idx, _idx2word, _word2embed = pickle.load(data_f)
                 return _word2idx, _idx2word, _word2embed
@@ -93,22 +96,21 @@ class DataSet(object):
         :param training_data_path: 带label的训练语料
         :return: label2idx和idx2label
         """
+        print("building vocabulary_label_sorted. training_data:", self.raw_data_path)
         cache_path = os.path.join(self.data_dir, "label_vocabulary.pik")
         print("cache_path:", cache_path, "file_exists:", os.path.exists(cache_path))
 
         if os.path.exists(cache_path):  # 如果缓存文件存在，则直接读取
-            print("building vocabulary_label from cache file...")
             with open(cache_path, 'rb') as data_f:
                 _label2idx, _idx2label = pickle.load(data_f)
                 return _label2idx, _idx2label
         else:
-            print("building vocabulary_label_sorted. training_data:", self.raw_data_path)
             _label2idx = dict()
             _idx2label = dict()
             label_count_dict = dict()  # {label:count} 统计各类别的样本数
             lines = read_json_format_file(self.raw_data_path)
             for line in lines:
-                label = line['top_category']
+                label = str(line['taste'])
                 if label_count_dict.get(label, None) is not None:
                     label_count_dict[label] += 1
                 else:
@@ -125,7 +127,7 @@ class DataSet(object):
                     countt += count_value
                 _label2idx[label] = i
                 _idx2label[i] = label
-            print("count top10:", countt)
+            print("count top10 labels:", countt)
 
             # 如果不存在写到缓存文件中
             if not os.path.exists(cache_path):
@@ -153,70 +155,85 @@ class DataSet(object):
         # 3.transform  y as scalar
         X = []
         Y = []
-        Y_decoder_input = []
         count_not_exist = 0
         if use_embedding:
             self.embedding = self.get_embedding(self.word2embed)
 
         for i, line in enumerate(lines):
-            title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
-            content = line["content"].strip()
+            title = line["title"].strip()
+            content = line["text"].strip()
             x = title + " " + content
-            y = line["top_category"]
+            x = CleanDoc(x).text
+            y = str(line["taste"])
             # 打印前几条
-            if i < 2:
+            if i < 1:
                 print("x{}:".format(i), x)  # get raw x
             x = split_text(x)
             x = [self.word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
-            if i < 2:
+            if i < 1:
                 print("x{}-word-index:".format(i), x)  # word to index
             y = self.label2index[y]
             X.append(x)
             Y.append(y)
 
+
         # 4.split to train,test and valid data(基于y标签分层)
         doc_num = len(X)
         print("number_doc:", doc_num)
-        train, test = self.stratified_sampling(X, Y, lines, valid_portion)
+        train, test = self.stratified_sampling(X, Y, valid_portion)
         print("load_data ended...")
         return train, test, test
 
-    def load_data_predict(self, predict_data_path, word2index, n_gram=False):
+    def load_data_sample(self, use_embedding=True, valid_portion=0.2):
+        """
+        划分训练集、测试集、验证集(小批量数据验证模型网络结构)
+        :param use_embedding: 提供embedding 词向量（默认提供）
+        :param valid_portion: 测试集比例（默认0.2）
+        :return: train, test, valid. where train=(trainX, trainY). where
+                        trainX: is a list of list.each list representation a sentence.trainY: is a list of label. each label is a number
+        """
         # 1. load raw data
-        print("load_data_predict.started...")
-        if predict_data_path:
-            predict_file = predict_data_path
-        else:
-            predict_file = self.corpus_predict_file
-        print("load_data.predict_data_path:", predict_file)
-        lines = read_json_format_file(predict_file)
+        print("load_data.started...")
+        print("load_data.training_data_path:", self.raw_data_path)
+        lines = read_json_format_file(self.raw_data_path)
         # 2.transform X as indices
         """
         #todo: 去掉停用词 -> 统计词频 -> 去除低频词
         """
         # 3.transform  y as scalar
-        predict_x = []
+        X = []
+        Y = []
+        count_not_exist = 0
+        if use_embedding:
+            self.embedding = self.get_embedding(self.word2embed)
 
         for i, line in enumerate(lines):
-            title = line["title"].strip().replace("\t", " ").replace("\n", " ").replace("\r", " ")
-            content = line["content"].strip()
-            doc_id = line["id"]
+            title = line["title"].strip()
+            content = line["text"].strip()
             x = title + " " + content
+            x = CleanDoc(x).text
+            y = str(line["taste"])
             # 打印前几条
-            if i < 2:
-                print("x{}:".format(i), x)  # get raw x
-            if n_gram:
-                x_ = get_ngrams(x)
-                x = split_text(x_)
-            else:
-                x = split_text(x)
-            x = [word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
-            if i < 2:
+            # if i < 1:
+            #     print("x{}:".format(i), x)  # get raw x
+            x = split_text(x)
+            x = [self.word2index.get(w, 0) for w in x]  # 若找不到单词，用0填充
+            if i < 1:
                 print("x{}-word-index:".format(i), x)  # word to index
-            predict_x.append((doc_id, x))
-        number_examples = len(predict_x)
-        print("number_examples:", number_examples)  #
-        return predict_x
+            y = self.label2index[y]
+            if i < 1000:
+                X.append(x)
+                Y.append(y)
+            else:
+                pass
+
+
+        # 4.split to train,test and valid data(基于y标签分层)
+        doc_num = len(X)
+        print("number_doc:", doc_num)
+        train, test = self.stratified_sampling(X, Y, valid_portion)
+        print("load_data ended...")
+        return train, test, test
 
 
     def get_embedding(self, word2embed):
@@ -228,8 +245,8 @@ class DataSet(object):
         word_embedding = np.array(word_embedding_list)
         return word_embedding
 
-    def stratified_sampling(self, x, y, all_data, valid_portion=0.2):
-        self.corpus_predict_file = os.path.join(self.data_dir, "corpus_predict")
+    def stratified_sampling(self, x, y, valid_portion):
+
         skf = StratifiedKFold(n_splits=int(1/valid_portion))
         i = 0
         for train_index, test_index in skf.split(x, y):
@@ -249,8 +266,6 @@ class DataSet(object):
                 trainy = [y[i] for i in train_index]
                 testx = [x[j] for j in test_index]
                 testy = [y[j] for j in test_index]
-                corpus_pred = [all_data[i] for i in test_index]
-                write_json_format_file(corpus_pred, self.corpus_predict_file)
                 return (trainx, trainy), (testx, testy)
 
     def load_data_from_h5py(self, cache_file_h5py, cache_file_pickle):
@@ -312,14 +327,19 @@ class DataSet(object):
         return label_count
 
 
+class SplitData2tsv(object):
 
-class TopcategoryCorpus(object):
-
-    def __init__(self, in_file1, in_file2, out_file):
+    def __init__(self, in_file1, out_dir):
         self.f1 = in_file1
-        self.f2 = in_file2
-        self.out = out_file
-        self.get_topcategory_corpus()
+        self.ft_file = os.path.join(out_dir, 'raw_data')
+        self.train_file = os.path.join(out_dir, 'train.tsv')
+        self.dev_file = os.path.join(out_dir, 'dev.tsv')
+        self.test_file = os.path.join(out_dir, 'test.tsv')
+        self.index2label = {"700": "Casual puzzle", "701": "Real-Time Strategy",
+                            "702": "Chess & Card games", "703": "Sports games",
+                            "704": "Simulation Game", "705": "Action Game",
+                            "706": "Role-playing Game", "707": "Other games"}
+        self.get_category_corpus_file()
 
     def read_json_format_file(self, file):
         print(">>>>> 正在读原始取数据文件：{}".format(file))
@@ -329,61 +349,133 @@ class TopcategoryCorpus(object):
                 if not _line:
                     break
                 else:
-                    line = json.loads(_line)
+                    line = json.loads(_line.strip())
                     yield line
 
-    def shuff_data(self):
-        data_all = list()
+    def get_data(self, ft_file):
+        X = list()
+        Y = list()
+        file = open(ft_file, "w")
+        _count = dict()
         for line in self.read_json_format_file(self.f1):
-            if 'tags' in line.keys():
-                del line['tags']
-            if line['top_category'] not in ("technology", "auto", "science"):
-                data_all.append(line)
-        for line_ in self.read_json_format_file(self.f2):
-            data_all.append(line_)
-        # print(len(data_all))
-        random.shuffle(data_all)
-        return data_all
+            if line:
+                # result = self._preline(line)
+                result = self._preline_v2(line)
+                if result:
+                    x, y = result
+                    if y in _count.keys():
+                        if _count[y] > 1000:
+                            continue
+                        else:
+                            _count[y] += 1
+                            file.write(json.dumps(line) + "\n")
+                            X.append(x)
+                            Y.append(y)
+                    else:
+                        _count[y] = 1
+                        file.write(json.dumps(line) + "\n")
+                        X.append(x)
+                        Y.append(y)
+        file.close()
+        return X, Y
 
-    def get_topcategory_corpus(self):
-        print(">>>>> 正在处理训练语料")
-        o_file = open(self.out, 'w')
-        category_count = dict()
-        for line in self.shuff_data():
-            if line['top_category'] in category_count.keys():
-                if category_count[line['top_category']] < 10000:
-                    category_count[line['top_category']] += 1
-                    o_file.write(json.dumps(line, ensure_ascii=False) + "\n")
-                else:
-                    continue
+    def stratified_sampling(self, x, y, valid_portion):
+
+        skf = StratifiedKFold(n_splits=int(1/valid_portion))
+        i = 0
+        for train_index, test_index in skf.split(x, y):
+            i += 1
+            if i < 2:
+                train_label_id_count = self._label_count([y[i] for i in train_index])
+                test_label_id_count = self._label_count([y[j] for j in test_index])
+                train_label_count = dict()
+                test_label_count = dict()
+                for id, count in train_label_id_count.items():
+                    train_label_count[self.index2label[id]] = count
+                for id, count in test_label_id_count.items():
+                    test_label_count[self.index2label[id]] = count
+                print("train_label_count: {}".format(json.dumps(train_label_count, indent=4)))
+                print("test_label_count: {}".format(json.dumps(test_label_count, indent=4)))
+                train = [y[i] + "\t" + x[i] for i in train_index]
+                dev = [y[j] + "\t" + x[j] for j in test_index]
+
+                return train, dev
+
+    def _label_count(self, label_list):
+        label_count = dict()
+        for i in label_list:
+            if label_count.get(i, None) is not None:
+                label_count[i] += 1
             else:
-                category_count[line['top_category']] = 1
-                o_file.write(json.dumps(line, ensure_ascii=False) + "\n")
-        print(">>>>> 各一级类类别：\n{}".format(json.dumps(category_count, indent=4)))
-        print("<<<<< 训练语料已处理完成：{}".format(self.out))
+                label_count[i] = 1
+        return label_count
 
 
-def main():
-    # 处理语料
-    # data_base_dir = r'/data/in_hi_news/train_data'
-    data_base_dir = r"/home/joshua/tensorflowProject/tensorflow_project/data/hi_news"
-    file1 = os.path.join(data_base_dir, )
-    file2 = os.path.join(data_base_dir, 'auto_science_tech')
-    out_file = os.path.join(data_base_dir, 'top_category_corpus')
-    TopcategoryCorpus(file1, file2, out_file)
+    def _preline(self, line_json):
+        # line_json = json.loads(line)
+        title = line_json["article_title"]
+        content = ""
+        dataY = str(line_json["category"])
+        if dataY in ["700", "701", "702", "703", "704", "705", "706", "707"]:
+            if "text" in line_json:
+                content = line_json["text"]
+            text_str = CleanDoc(content).text
+            t_str = CleanDoc(title).text
+            if t_str or text_str:
+                dataX = t_str + ' ' + text_str  # 清洗数据
+                return dataX, dataY
+            else:
+                return None
+        else:
+            return None
 
-    # 加载数据
-    # data_dir = "/home/zoushuai/algoproject/tf_project/data/hi_news"
-    # training_data_file = os.path.join(data_dir, "top_category_corpus")
-    # word2vec_file = os.path.join(data_dir, "word2vec.bin")
-    # ds = DataSet(data_dir, word2vec_file, training_data_file)
-    # train, test, _ = ds.load_data(use_embedding=False, valid_portion=0.2)
-    # trainx, trainy = train
-    # testx, testy = test
-    # print(trainx[:1])
-    # print(trainy[:1])
+    def clean_title(self, text):
+        text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = text.lower()
+        no_emoji = CleanDoc(text)._remove_emoji(text)
+        del_symbol = string.punctuation  # ASCII 标点符号，数字
+        remove_punctuation_map = dict((ord(char), None) for char in del_symbol)
+        text = no_emoji.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
+        text = re.sub(r"\s+", " ", text)
+        return text
 
-if __name__ == "__main__":
-    main()
+    def _preline_v2(self, line_json):
+        # line_json = json.loads(line)
+        title = line_json["article_title"]
+        dataY = str(line_json["category"])
+        if dataY in ["700", "701", "702", "703", "704", "705", "706", "707"]:
+            # t_str = CleanDoc(title).text
+            t_str = self.clean_title(title)
+            if t_str.replace(" ", ""):
+                # dataX = title
+                dataX = t_str  # 清洗数据
+                return dataX, dataY
+            else:
+                return None
+        else:
+            return None
+
+    def write_tvs_file(self, data, file):
+        print(">>>>> 正在写入文件")
+        with open(file, "w") as f:
+            for line in data:
+                f.write(line + "\n")
+        print("<<<<< 已写入到文件：{}".format(file))
 
 
+    def get_category_corpus_file(self):
+        print(">>>>> 正在处理训练语料")
+        X, Y = self.get_data(self.ft_file)
+        train, dev = self.stratified_sampling(X, Y, 0.2)
+        self.write_tvs_file(train, self.train_file)
+        self.write_tvs_file(dev, self.dev_file)
+        self.write_tvs_file(dev, self.test_file)
+
+
+
+
+if __name__ == '__main__':
+    root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    data_dir = os.path.join(root_dir, "data", "game_video")
+    raw_data = "/data/game_category/raw_data"
+    SplitData2tsv(raw_data, data_dir)

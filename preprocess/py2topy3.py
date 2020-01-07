@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 12/10/19 7:41 PM
-@File    : 2to3.py
+@File    : py2topy3.py
 @Desc    : python2代码批量转换python3
 
 """

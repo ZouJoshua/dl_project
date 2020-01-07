@@ -31,7 +31,7 @@ class SogouCategoryModel(object):
         self.model = self.train()
 
     def train(self):
-        model = FastTextClassifier(self.mp, self.cf, self.cs, train=True, file_path=self.cp).model
+        model = FastTextClassifier(self.mp, self.cf, self.cs, train=True, data_path=self.cp).model
         return model
 
 

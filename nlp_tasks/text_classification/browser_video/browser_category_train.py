@@ -16,7 +16,7 @@ import re
 import string
 from sklearn.model_selection import StratifiedKFold
 
-from preprocess.preprocess_tools import CleanDoc, read_json_format_file, write_file
+from nlp_corpus_preprocess.preprocess_tools import CleanDoc, read_json_format_file, write_file
 from model_normal.fasttext_model import FastTextClassifier
 from evaluate.eval_calculate import EvaluateModel
 

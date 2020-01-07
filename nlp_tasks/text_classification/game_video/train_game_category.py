@@ -19,7 +19,7 @@ sys.path.append(root_nlp_path)
 
 import json
 import fasttext
-from preprocess.preprocess_tools import clean_string
+from nlp_corpus_preprocess.preprocess_tools import clean_string
 from evaluate import evaluate_model
 from sklearn.model_selection import StratifiedKFold
 import time

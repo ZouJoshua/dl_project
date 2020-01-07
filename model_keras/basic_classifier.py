@@ -11,7 +11,7 @@
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.engine.saving import load_model
 from keras.datasets import imdb
-from keras.layers import Input, Dense, Embedding, Flatten, Lambda
+from keras.layers import Input, Dense, Embedding, Lambda
 from keras.models import Model
 import os
 

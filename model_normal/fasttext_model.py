@@ -19,8 +19,6 @@ try:
 except:
     from six.moves import configparser
 
-from preprocess.preprocess_tools import clean_zh_text, clean_en_text
-
 
 class FastTextClassifier:
     """
@@ -28,8 +26,8 @@ class FastTextClassifier:
     """
 
     def __init__(self, model_path, args_config_file,
-                 args_section, train=False,
-                 file_path=None, logger=None):
+                 args_section, train=False, model_name="classification.bin",
+                 data_path=None, logger=None):
         """
         初始化
         :param file_path: 训练数据路径
@@ -43,14 +41,14 @@ class FastTextClassifier:
             self.log = logging.getLogger("fasttext_train_log")
             self.log.setLevel(logging.INFO)
 
-        self.model_path = model_path
+        self.model_file = os.path.join(model_path, model_name)
         if not train:
-            self.model = self.load(self.model_path)
+            self.model = self.load(self.model_file)
             assert self.model is not None, '训练模型无法获取'
         else:
-            assert file_path is not None, '训练时, file_path不能为None'
-            self.train_path = os.path.join(file_path, 'train.txt')
-            self.test_path = os.path.join(file_path, 'test.txt')
+            assert data_path is not None, '训练时, file_path不能为None'
+            self.train_path = os.path.join(data_path, 'train.txt')
+            self.test_path = os.path.join(data_path, 'test.txt')
             self.model = self.train()
 
     def train(self):
@@ -104,28 +102,15 @@ class FastTextClassifier:
         # print('predict:', output)
         return output
 
-    def load(self, model_path):
+    def load(self, model_file):
         """
         加载训练好的模型
         :param model_path: 训练好的模型路径
         :return:
         """
-        if os.path.exists(self.model_path + '.bin'):
-            return fasttext.load_model(model_path + '.bin')
+        if os.path.exists(model_file):
+            return fasttext.load_model(model_file)
         else:
-            return None
+            raise Exception("Model file {} not found.".format(model_file))
 
 
-def clean(file_path):
-    """
-    清理文本, 然后利用清理后的文本进行训练
-    """
-    with open(file_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-        lines_clean = []
-        for line in lines:
-            line_list = line.split('__label__')
-            lines_clean.append(clean_en_text(line_list[0]) + ' __label__' + line_list[1])
-
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.writelines(lines_clean)

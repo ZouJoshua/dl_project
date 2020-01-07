@@ -8,14 +8,14 @@
 
 """
 
-
+import os
+import pickle
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 
 from setting import DATA_PATH
-from nlp_tasks.text_classification.brief_news.preprocess import DataSet
-
+from nlp_tasks.text_classification.brief_news.preprocess import DataSet, dump_data
 
 
 
@@ -70,12 +70,23 @@ class TextClassifier(object):
 
 def CategoryNB():
     cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
-    ds = DataSet(DATA_PATH, cat_list)
-    # x, y = zip(*ds.data)
-    x_train = ds.x_train
-    y_train = ds.y_train
-    x_test = ds.x_test
-    y_test = ds.y_test
+    data_path = os.path.join(DATA_PATH, "brief_news")
+    train_dump_file = os.path.join(data_path, "train.pkl")
+    test_dump_file = os.path.join(data_path, "test.pkl")
+    if os.path.exists(train_dump_file) and os.path.exists(test_dump_file):
+        with open(train_dump_file, 'rb') as file_train, open(test_dump_file, "rb") as file_test:
+            train_data = pickle.load(file_train)
+            test_data = pickle.load(file_test)
+    else:
+        ds = DataSet(DATA_PATH, cat_list)
+        # x, y = zip(*ds.data)
+        train_data = (ds.x_train, ds.y_train)
+        test_data = (ds.x_test, ds.y_test)
+        dump_data(train_data, train_dump_file)
+        dump_data(test_data, test_dump_file)
+
+    x_train, y_train = train_data
+    x_test, y_test = test_data
     # text_classifier_v1 = TextClassifier(classifier=MultinomialNB())
     # text_classifier_v1.fit(x_train, y_train)
     # print("一元词语朴素贝叶斯分类准确率:")
@@ -90,12 +101,24 @@ def CategoryNB():
 
 def CategorySVM():
     cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
-    ds = DataSet(DATA_PATH, cat_list)
-    # x, y = zip(*ds.data)
-    x_train = ds.x_train
-    y_train = ds.y_train
-    x_test = ds.x_test
-    y_test = ds.y_test
+
+    data_path = os.path.join(DATA_PATH, "brief_news")
+    train_dump_file = os.path.join(data_path, "train.pkl")
+    test_dump_file = os.path.join(data_path, "test.pkl")
+    if os.path.exists(train_dump_file) and os.path.exists(test_dump_file):
+        with open(train_dump_file, 'rb') as file_train, open(test_dump_file, "rb") as file_test:
+            train_data = pickle.load(file_train)
+            test_data = pickle.load(file_test)
+    else:
+        ds = DataSet(DATA_PATH, cat_list)
+        # x, y = zip(*ds.data)
+        train_data = (ds.x_train, ds.y_train)
+        test_data = (ds.x_test, ds.y_test)
+        dump_data(train_data, train_dump_file)
+        dump_data(test_data, test_dump_file)
+
+    x_train, y_train = train_data
+    x_test, y_test = test_data
     # text_classifier_v1 = TextClassifier(classifier=SVC(kernel='linear'))
     # text_classifier_v1.fit(x_train, y_train)
     # print("一元词语支持向量机分类准确率:")

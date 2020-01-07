@@ -12,10 +12,10 @@
 import os
 import codecs
 import progressbar
-from ba_seq_label.knowledge_graph.stoke.character_stroke_handian import Stroke
+from nlp_tasks.knowledge_graph.stroke.character_stroke_handian import Stroke
 
 
-def analysis_stoke_corpus(directory):
+def analysis_stroke_corpus(directory):
     filenames = os.listdir(directory)
     stroke = Stroke()
     for filename in progressbar.progressbar(filenames):

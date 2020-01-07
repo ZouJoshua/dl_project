@@ -12,7 +12,7 @@ import os
 import pandas as pd
 import pycrfsuite
 
-from ba_seq_label.knowledge_graph.crfsuite_model import sent2features
+from nlp_tasks.knowledge_graph.crfsuite_model import sent2features
 
 from itertools import chain
 from sklearn.metrics import classification_report, confusion_matrix

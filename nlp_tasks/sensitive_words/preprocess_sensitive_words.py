@@ -8,7 +8,8 @@
 """
 
 import json
-
+import os
+from setting import DATA_PATH
 
 def en_sensitive_words_merge(raw_file, sensitive_type_file, type_file, result_file):
     with open(raw_file, 'r') as f:
@@ -35,10 +36,11 @@ def en_sensitive_words_merge(raw_file, sensitive_type_file, type_file, result_fi
 
 
 def main():
-    en_raw_file = "/home/zoushuai/algoproject/tf_project/data/sensitive_words/en_raw"
-    en_sensitive_type_file = "/home/zoushuai/algoproject/tf_project/data/sensitive_words/en_sensitive_type.json"
-    sensitive_type_file = "/home/zoushuai/algoproject/tf_project/data/sensitive_words/sensitive_type.json"
-    result_file = "/home/zoushuai/algoproject/tf_project/data/sensitive_words/en"
+
+    en_raw_file = os.path.join(DATA_PATH, "sensitive_words", "en_raw")
+    en_sensitive_type_file = os.path.join(DATA_PATH, "sensitive_words", "en_sensitive_type.json")
+    sensitive_type_file = os.path.join(DATA_PATH, "sensitive_words", "sensitive_type.json")
+    result_file = os.path.join(DATA_PATH, "sensitive_words", "en")
     en_sensitive_words_merge(en_raw_file, en_sensitive_type_file, sensitive_type_file, result_file)
 
 

@@ -3,13 +3,13 @@
 """
 @Author  : Joshua
 @Time    : 19-7-16 下午7:29
-@File    : word2vec.py
+@File    : gensim_word2vec.py
 @Desc    : 
 """
 
 
 from gensim.models import word2vec
-from preprocess.pre_process import process_data
+from preprocess.tools import split_text, read_txt_file
 
 
 class GensimWord2VecModel:
@@ -18,7 +18,7 @@ class GensimWord2VecModel:
         """
         用gensim word2vec 训练词向量
         :param train_file: 分好词的文本
-        :param model_path: 模型保存的路劲
+        :param model_path: 模型保存的路径
         """
         self.train_file = train_file
         self.model_path = model_path
@@ -28,7 +28,7 @@ class GensimWord2VecModel:
             self.save(self.model_path)
 
     def train(self):
-        sentences = process_data(self.train_file)
+        sentences = Sentences(self.train_file)
         model = word2vec.Word2Vec(sentences, min_count=2, window=3, size=300, workers=4)
         return model
 
@@ -48,3 +48,17 @@ class GensimWord2VecModel:
         except FileNotFoundError:
             model = None
         return model
+
+class Sentences(object):
+
+    def __init__(self, filename):
+        self.file = filename
+
+    def __iter__(self):
+        print(">>>>> 正在读取embed语料")
+        _doc_count = 0
+        for doc in read_txt_file(self.file):
+            _doc_count += 1
+            word_list = split_text(doc)
+            yield word_list
+        print("<<<<< 已读取{}文档".format(_doc_count))

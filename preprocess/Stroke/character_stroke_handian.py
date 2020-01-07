@@ -3,14 +3,13 @@
 """
 @Author  : Joshua
 @Time    : 12/10/19 7:29 PM
-@File    : character_stoke_handian.py
+@File    : character_stroke_handian.py
 @Desc    : 
 
 """
 
 
-# from handian import Handian
-from corpus_process.Stoke.handian import Handian
+from preprocess.Stroke.handian import Handian
 import urllib.request as urllib2
 import urllib
 from bs4 import BeautifulSoup
@@ -23,9 +22,9 @@ if sys.getdefaultencoding() != defaultencoding:
     sys.setdefaultencoding(defaultencoding)
 
 
-class Stoke(object):
+class Stroke(object):
     # dictionary_filepath = "./default_stoke.txt"
-    dictionary_filepath = "./Stoke/default_stoke.txt"
+    dictionary_filepath = "./default_stroke.txt"
     # baiduhanyu_url = 'http://hanyu.baidu.com/zici/s?ptype=zici&wd=%s'
     # hanzi5_url = "http://www.hanzi5.com/bishun/%s.html"
     # hanzi5_url = "http://www.zdic.net/z/?/js/%s.htm"
@@ -122,7 +121,7 @@ class Stoke(object):
 if __name__ == "__main__":
     print("extract character stoke from [http://www.zdic.net/]")
 
-    stoke = Stoke()
+    stoke = Stroke()
     print("中", stoke.get_stoke("中"))
     print("王", stoke.get_stoke("王"))
     print("吋", stoke.get_stoke("吋"))

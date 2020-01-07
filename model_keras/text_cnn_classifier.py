@@ -23,7 +23,7 @@ from keras_preprocessing.sequence import pad_sequences
 from nltk.corpus import stopwords
 from sklearn.model_selection import train_test_split
 
-from preprocess.preprocess_tools import clean_en_text
+from preprocess.tools import clean_en_text
 from preprocess.plot_model_history import plot
 
 

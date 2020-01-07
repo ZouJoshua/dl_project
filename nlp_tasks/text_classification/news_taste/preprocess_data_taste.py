@@ -11,7 +11,6 @@
 
 
 import os
-import re
 import pickle
 import json
 import random
@@ -20,8 +19,8 @@ import numpy as np
 import h5py
 from sklearn.model_selection import StratifiedKFold
 from gensim.models import KeyedVectors
-from preprocess.preprocess_tools import read_json_format_file, split_text
-from preprocess.preprocess_tools import CleanDoc
+from nlp_corpus_preprocess.preprocess_tools import read_json_format_file, split_text
+from nlp_corpus_preprocess.preprocess_tools import CleanDoc
 
 class DataSet(object):
 

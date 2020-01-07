@@ -339,6 +339,21 @@ def clean_zh_text(text):
     text = re.sub(r'["\'` ?!【】\[\]./%：:&()=，,<>+_；;\-*]+', " ", text)
     return text
 
+def clean(file_path):
+    """
+    清理文本, 然后利用清理后的文本进行训练
+    """
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        lines_clean = []
+        for line in lines:
+            line_list = line.split('__label__')
+            lines_clean.append(clean_en_text(line_list[0]) + ' __label__' + line_list[1])
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.writelines(lines_clean)
+
+
 
 def clean_to_list(text):
     """

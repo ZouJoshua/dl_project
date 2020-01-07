@@ -9,7 +9,7 @@
 """
 
 
-from nlp_tasks.knowledge_graph.stoke.handian import Handian
+from nlp_tasks.knowledge_graph.stroke.handian import Handian
 import urllib.request as urllib2
 import urllib
 from bs4 import BeautifulSoup
@@ -24,11 +24,11 @@ if sys.getdefaultencoding() != defaultencoding:
 
 
 class Stroke(object):
-    dictionary_stroke_filepath = "./stroke/default_stroke.txt"
-    dictionary_wubi_filepath = "./stroke/default_wubi.txt"
-    dictionary_cangjie_filepath = "./stroke/default_cangjie.txt"
-    dictionary_zheng_filepath = "./stroke/default_zheng.txt"
-    dictionary_sijiao_filepath = "./stroke/default_sijiao.txt"
+    dictionary_stroke_filepath = "./default_stroke.txt"
+    dictionary_wubi_filepath = "./default_wubi.txt"
+    dictionary_cangjie_filepath = "./default_cangjie.txt"
+    dictionary_zheng_filepath = "./default_zheng.txt"
+    dictionary_sijiao_filepath = "./default_sijiao.txt"
     handian_url = None
 
     def __init__(self):
@@ -93,7 +93,7 @@ class Stroke(object):
     def get_info_from_handian(self, word, kind):
         url = self.handian_url
         # print("url", url)
-        if url == "http://www.zdic.net/sousuo/":
+        if url == "http://www.zdic.net/search/":
             return None
 
         html = self.post_baidu(url)
@@ -109,11 +109,12 @@ class Stroke(object):
         soup = BeautifulSoup(html_doc, 'html.parser')
         l = []
         if kind == 'stroke':
-            zh_stoke = soup.find(id="z_i_t2_bis")
-            contents = zh_stoke.contents
+            zh_stroke = soup.find(id="z_i_t2_bis")
+            contents = zh_stroke.contents
         elif kind == 'wubi':
             encoding = soup.find_all(attrs={'class': 'diczx7'})
             contents = encoding[0].contents
+            print(contents)
         elif kind == 'cangjie':
             encoding = soup.find_all(attrs={'class': 'diczx7'})
             contents = encoding[1].contents
@@ -138,7 +139,7 @@ class Stroke(object):
             # request = urllib2.Request(url)
             request = urllib2.Request(url)
             request.add_header('User-agent', 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36')
-            request.add_header('connection','keep-alive')
+            request.add_header('connection', 'keep-alive')
             request.add_header('referer', url)
             response = urllib2.urlopen(request, timeout=timeout)
             html = response.read()
@@ -150,10 +151,10 @@ class Stroke(object):
 
 
 if __name__ == "__main__":
-    print("extract character stoke from [http://www.zdic.net/]")
+    print("extract character stroke from [http://www.zdic.net/]")
 
     stroke = Stroke()
-    print("中", stroke.get_info("中", 'stoke'))
+    print("中", stroke.get_info("中", 'stroke'))
     print("王", stroke.get_info("王", 'wubi'))
     print("吋", stroke.get_info("吋", 'cangjie'))
     print("緉", stroke.get_info("緉", 'zheng'))

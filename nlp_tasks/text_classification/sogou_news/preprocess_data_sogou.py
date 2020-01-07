@@ -17,7 +17,7 @@ from sklearn.model_selection import StratifiedKFold
 import jieba
 from string import punctuation
 from setting import DATA_PATH
-from preprocess.preprocess_tools import read_json_format_file
+from nlp_corpus_preprocess.preprocess_tools import read_json_format_file
 
 
 class PreCorpus(object):

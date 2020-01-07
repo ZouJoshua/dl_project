@@ -11,19 +11,19 @@
 """
 
 import tensorflow as tf
-from minst.data_processing import *
+from image_classification.mnist_digit_recognition.data_processing import *
 
 #读取训练数据
 train_img_savefile = r"D:\Python\Anaconda\TensorFlow\file\minst\train_img"
 train_lab_savefile = r"D:\Python\Anaconda\TensorFlow\file\minst\train_lab\train_label.txt"
-images = img2mat(train_img_savefile,filenum=60000)
-labels = lab2mat(train_lab_savefile,rownum = 60000,num_classes=10,one_hot=True)
+images = img2mat(train_img_savefile, filenum=60000)
+labels = lab2mat(train_lab_savefile, rownum=60000, num_classes=10, one_hot=True)
 train = dataset(images,labels)
 #读取测试数据
 test_img_savefile = r"D:\Python\Anaconda\TensorFlow\file\minst\test_img"
 test_lab_savefile = r"D:\Python\Anaconda\TensorFlow\file\minst\test_lab\test_label.txt"
-t_images = img2mat(test_img_savefile,filenum = 10000)
-t_labels = lab2mat(test_lab_savefile,rownum = 10000,num_classes=10,one_hot=True)
+t_images = img2mat(test_img_savefile, filenum=10000)
+t_labels = lab2mat(test_lab_savefile, rownum=10000, num_classes=10, one_hot=True)
 
 
 #Parameters参数
