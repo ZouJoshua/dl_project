@@ -12,18 +12,6 @@ import os
 from setting import DATA_PATH, CONFIG_PATH
 from nlp_tasks.text_classification.brief_news.preprocess import DataSet
 from model_normal.fasttext_model import FastTextClassifier
-from evaluate.eval_calculate import EvaluateModel
-
-
-config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
-config_section = "fasttext.args_zh"
-corpus_path = os.path.join(DATA_PATH, "brief_news")
-
-
-
-cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
-ds = DataSet(DATA_PATH, cat_list)
-# x, y = zip(*ds.data)
 
 
 
@@ -46,16 +34,22 @@ class BriefNewsCategoryModel(object):
 
     def write_file(self):
 
+        cat_list = ["car", "entertainment", "finance", "sports", "military", "technology"]
+        ds = DataSet(DATA_PATH, cat_list)
         with open(self.train_file, "w") as f:
             for train in zip(ds.x_train, ds.y_train):
-                line = "__label__".join(train)
-                f.write(line + "\n")
+                fasttext_line = "__label__{} {}".format(train[1], train[0])
+                # fasttext_line = "__label__".join(train)
+                f.write(fasttext_line + "\n")
         with open(self.test_file, "w") as f:
-            for train in zip(ds.x_test, ds.y_test):
-                line = "__label__".join(train)
-                f.write(line + "\n")
+            for test in zip(ds.x_test, ds.y_test):
+                fasttext_line = "__label__{} {}".format(test[1], test[0])
+                f.write(fasttext_line + "\n")
 
 def main():
+    config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
+    config_section = "fasttext.args_zh"
+    corpus_path = os.path.join(DATA_PATH, "brief_news")
     model = BriefNewsCategoryModel(corpus_path, config_file, config_section, corpus_path)
 
 

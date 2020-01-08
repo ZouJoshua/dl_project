@@ -9,7 +9,7 @@
 """
 
 
-from preprocess.Stroke.handian import Handian
+from preprocess.stroke.handian import Handian
 import urllib.request as urllib2
 import urllib
 from bs4 import BeautifulSoup

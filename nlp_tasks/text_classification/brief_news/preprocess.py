@@ -20,7 +20,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 def read_news_from_csv(data_path):
     df = pd.read_csv(data_path, encoding='utf-8')
     df = df.dropna()
-    lines = df.content.values.tolist()[:20000]
+    lines = df.content.values.tolist()[:30000]
     return lines
 
 def read_stopwords(stopwords_path):
@@ -32,9 +32,12 @@ def preprocess_text(content_lines, sentences, category, stopwords):
     for line in content_lines:
         try:
             segs = jieba.lcut(line)
-            segs = filter(lambda x: len(x) > 1, segs)
-            segs = filter(lambda x: x not in stopwords, list(segs))
-            sentences.append((" ".join(list(segs)), category))
+            segs = filter(lambda x: x not in stopwords, segs)
+            segs = list(filter(lambda x: len(x) > 1, segs))
+            if len(segs) > 2:
+                sentences.append((" ".join(segs), category))
+            else:
+                continue
         except Exception as e:
             print(line)
             continue
