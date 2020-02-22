@@ -53,6 +53,7 @@ class FastTextClassifier:
             self.train_file = os.path.join(data_path, 'train.txt')
             self.test_file = os.path.join(data_path, 'test.txt')
             self.model = self.train()
+            self.save(quantize=False)
 
     def train(self, detail=True):
         """
@@ -75,6 +76,14 @@ class FastTextClassifier:
             self.log.info('测试集各类别准确率: {}'.format(json.dumps(test_result_detail, indent=4)))
 
         return model
+
+    def save(self, quantize=False):
+        self.model.save_model(self.model_file)
+        if quantize:
+            model = fasttext.load_model(self.model_file)
+            model.quantize(input=self.train_file, retrain=True)
+            ftz_model = os.path.splitext(self.model_file)[0] + ".ftz"
+            model.save_model(ftz_model)
 
     def get_train_args(self, section=None):
         config = configparser.ConfigParser()
@@ -127,8 +136,8 @@ class FastTextClassifier:
     @staticmethod
     def print_results(N, p, r):
         print("样本数N\t" + str(N))
-        print("精确率P@{}\t{:.3f}".format(1, p))
-        print("召回率R@{}\t{:.3f}".format(1, r))
+        print("精确率P@{}\t {:.3f}".format(1, p))
+        print("召回率R@{}\t {:.3f}".format(1, r))
 
 
 

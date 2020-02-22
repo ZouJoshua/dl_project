@@ -73,6 +73,9 @@ class TextCNN(object):
         max-pooling
         softmax layer"""
         self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)  # [None,sencente_len,embed_size]
+        # 因为卷积操作conv2d()需要输入的是四维数据，分别代表着批处理大小、宽度、高度、通道数。
+        # 而embedded_chars只有前三维，所以需要添加一维，设为1。变为：[input_x.shape[0], sequence_length, embedding_size, 1]
+        # [训练时一个batch的图片数量, 图片高度, 图片宽度, 图像通道数]
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
         # if self.use_mulitple_layer_cnn: # this may take 50G memory.
@@ -106,7 +109,13 @@ class TextCNN(object):
                 # conv2d ===> computes a 2-D convolution given 4-D `input` and `filter` tensors.
                 # *num_filters ---> [1, sentence_len - filter_size + 1, 1, num_filters]
                 # *batch_size ---> [batch_size, sentence_len - filter_size + 1, 1, num_filters]
-                # conv2d函数的参数：
+                # 卷积层conv2d函数的参数：
+                # 构建卷积核尺寸，输入和输出channel分别为1和num_filters
+                # 相当于CNN中的卷积核，它要求是一个Tensor，
+                # 具有[filter_height, filter_width, in_channels, out_channels]这样的shape，
+                # 具体含义是[卷积核的高度，卷积核的宽度，图像通道数，卷积核个数]，
+                # 要求类型与参数input相同，有一个地方需要注意，第三维in_channels，就是参数input的第四维
+                # 做完卷积之后，矩阵大小为 [None, sequence_length - filter_size + 1, 1, num_filters]
                 # input: [batch, in_height, in_width, in_channels]，
                 # filter/kernel: [filter_height, filter_width, in_channels, out_channels]
                 # output: 4-D [1,sequence_length-filter_size+1,1,1]，得到的是w.x的部分的值
@@ -117,14 +126,24 @@ class TextCNN(object):
                 # h是最终卷积层的输出，即每个feature map，shape = [batch_size, sentence_len - filter_size + 1, 1, num_filters]
                 b = tf.get_variable("b-%s" % filter_size, [self.num_filters])
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), "relu")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
+
                 # step4.max-pooling.
+                # 最大池化, 选取卷积结果的最大值pooled的尺寸为[None, 1, 1, 128](卷积核个数)
+                # 本质上是一个特征向量，最后一个维度是特征代表数量
+                # 待池化的四维张量，维度是[batch, height, width, channels]
+                # 池化窗口大小，长度（大于）等于4的数组，与value的维度对应，
+                # 一般为[1,height,width,1]，batch和channels上不池化
                 # value: A 4-D `Tensor` with shape `[batch, height, width, channels]
                 # ksize: A list of ints that has length >= 4.
                 # strides: A list of ints that has length >= 4.
                 pooled = tf.nn.max_pool(h, ksize=[1, self.sentence_len - filter_size + 1, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name="pool")  # shape:[batch_size, 1, 1, num_filters].max_pool:performs the max pooling on the input.
                 pooled_outputs.append(pooled)
         # step4. combine all pooled features, and flatten the feature.output' shape is a [1,None]
-        self.h_pool = tf.concat(pooled_outputs, 3)  # shape:[batch_size, 1, 1, num_filters_total]. tf.concat=>concatenates tensors along one dimension.where num_filters_total=num_filters_1+num_filters_2+num_filters_3
+        # 将所有window_size下的feature_vector也组合成一个single vector，作为最后一层softmax的输入
+        # shape:[batch_size, 1, 1, num_filters_total]. tf.concat=>concatenates tensors along one dimension.
+        # 因为3种filter卷积池化之后是一个scalar, 共有num_filters_total = num_filters * len(filter_sizes)
+        # 把每一个max-pooling之后的张量合并起来之后得到一个长向量 [batch_size, num_filters_total]
+        self.h_pool = tf.concat(pooled_outputs, 3)
         self.h_pool_flat = tf.reshape(self.h_pool, [-1, self.num_filters_total])  # shape should be:[None,num_filters_total]. here this operation has some result as tf.sequeeze().e.g. x's shape:[3,3];tf.reshape(-1,x) & (3, 3)---->(1,9)
 
         # step5. add dropout: use tf.nn.dropout

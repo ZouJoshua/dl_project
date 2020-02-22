@@ -48,7 +48,7 @@ class BriefNewsCategoryModel(object):
 
 def main():
     config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
-    config_section = "fasttext.args_zh"
+    config_section = "fasttext.args_brief_news"
     corpus_path = os.path.join(DATA_PATH, "brief_news")
     model = BriefNewsCategoryModel(corpus_path, config_file, config_section, corpus_path)
 
