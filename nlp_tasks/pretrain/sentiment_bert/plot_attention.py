@@ -11,7 +11,7 @@
 
 import torch
 from model_pytorch.sentiment_bert_model import BertModel, BertConfig
-from .inference_dataloader import preprocessing
+from nlp_tasks.pretrain.sentiment_bert.inference_dataloader import preprocessing
 import warnings
 import json
 import math
@@ -19,7 +19,13 @@ import os
 import configparser
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
-font = FontProperties(fname='./SimHei.ttf')
+
+from setting import DATA_PATH, CONFIG_PATH
+
+
+font_path = os.path.join(DATA_PATH, "common", "font", "SimHei.ttf")
+config_path = os.path.join(CONFIG_PATH, "bert_model_config.ini")
+font = FontProperties(fname=font_path)
 
 class PlotAttention:
     def __init__(self,
@@ -29,8 +35,8 @@ class PlotAttention:
                  ):
         # 加载配置文件
         config_ = configparser.ConfigParser()
-        config_.read("./model_config.ini")
-        self.config = config_["DEFAULT"]
+        config_.read(config_path)
+        self.config = config_["SENTIMENT"]
         # 词量, 注意在这里实际字(词)汇量 = vocab_size - 20,
         # 因为前20个token用来做一些特殊功能, 如padding等等
         self.vocab_size = int(self.config["vocab_size"])
@@ -123,7 +129,7 @@ class PlotAttention:
         plt.imshow(attention_matrices[layer_num][0][head_num])
         plt.yticks(range(len(labels)), labels, fontproperties=font, fontsize=18)
         plt.xticks(range(len(labels)), labels, fontproperties=font, fontsize=18)
-        # plt.show()
+        plt.show()
 
     def find_most_recent_state_dict(self, dir_path):
         # 找到模型存储的最新的state_dict路径
