@@ -21,7 +21,7 @@ import json
 import random
 import re
 
-import modeling
+import model_tensorflow.bert_model.modeling as modeling
 import six
 import tensorflow as tf
 

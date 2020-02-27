@@ -21,9 +21,9 @@ from __future__ import print_function
 import collections
 import csv
 import os
-import modeling
-import optimization
-import tokenization
+import model_tensorflow.bert_model.modeling as modeling
+import model_tensorflow.bert_model.optimization as optimization
+import model_tensorflow.bert_model.tokenization as tokenization
 import tensorflow as tf
 
 flags = tf.flags
@@ -573,6 +573,8 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
   def input_fn(params):
     """The actual input function."""
+    # 对于训练，我们需要大量的并行的读取和洗牌
+    # 对于评估，我们不需要洗牌，并行的读取也无关紧要
     batch_size = params["batch_size"]
 
     # For training, we want a lot of parallel reading and shuffling.
@@ -594,7 +596,9 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
-  """Truncates a sequence pair in place to the maximum length."""
+  """Truncates a sequence pair in place to the maximum length.
+  将序列对截断到最大长度max_length
+  """
 
   # This is a simple heuristic which will always truncate the longer sequence
   # one token at a time. This makes more sense than truncating an equal percent
@@ -612,7 +616,10 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 
 def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
                  labels, num_labels, use_one_hot_embeddings):
-  """Creates a classification model."""
+  """Creates a classification model.
+  1.使用modeling.py中的BerModel类创建模型
+  2.计算交叉熵损失loss
+  """
   model = modeling.BertModel(
       config=bert_config,
       is_training=is_training,
@@ -640,6 +647,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
   with tf.variable_scope("loss"):
     if is_training:
       # I.e., 0.1 dropout
+      # dropout：减小模型过拟合，保留90%的网络连接，随机drop 10%
       output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
 
     logits = tf.matmul(output_layer, output_weights, transpose_b=True)
@@ -650,6 +658,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
     one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
 
     per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
+    # 交叉熵损失：交叉熵的值越小，两个概率分布就越接近
     loss = tf.reduce_mean(per_example_loss)
 
     return (loss, per_example_loss, logits, probabilities)
@@ -679,6 +688,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
+    # 1.创建bert的model 2.计算loss
     (total_loss, per_example_loss, logits, probabilities) = create_model(
         bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
         num_labels, use_one_hot_embeddings)
@@ -859,29 +869,32 @@ def main(_):
   tokenizer = tokenization.FullTokenizer(
       vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
-  tpu_cluster_resolver = None
+  tpu_cluster_resolver = None   # tpu集群处理
   if FLAGS.use_tpu and FLAGS.tpu_name:
     tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
         FLAGS.tpu_name, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
 
-  is_per_host = tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2
-  run_config = tf.contrib.tpu.RunConfig(
+  is_per_host = tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2  # per_host：每主机，XLnet中num_core_per_host指的是每主机核数
+  run_config = tf.contrib.tpu.RunConfig(  # tpu的运行配置
       cluster=tpu_cluster_resolver,
       master=FLAGS.master,
       model_dir=FLAGS.output_dir,
       save_checkpoints_steps=FLAGS.save_checkpoints_steps,
       tpu_config=tf.contrib.tpu.TPUConfig(
-          iterations_per_loop=FLAGS.iterations_per_loop,
-          num_shards=FLAGS.num_tpu_cores,
+          iterations_per_loop=FLAGS.iterations_per_loop,   # 在每个estimator调用中执行多少步，default中为1000步
+          num_shards=FLAGS.num_tpu_cores,  # # tpu核数，default为8
           per_host_input_for_training=is_per_host))
 
   train_examples = None
   num_train_steps = None
   num_warmup_steps = None
   if FLAGS.do_train:
+    # 返回列表是一行一行的Inputexample对象，每行包括了guid，train_a,label
     train_examples = processor.get_train_examples(FLAGS.data_dir)
+    # 训练的次数：(训练集的样本数/每批次大小)*训练几轮
     num_train_steps = int(
         len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
+    # 在预热学习中，线性地增加学习率
     num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
 
   model_fn = model_fn_builder(
@@ -906,12 +919,14 @@ def main(_):
 
   if FLAGS.do_train:
     train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
+    # 实现Input_example到Feature_example, TFRecord化
     file_based_convert_examples_to_features(
         train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", len(train_examples))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
     tf.logging.info("  Num steps = %d", num_train_steps)
+    # 调用此函数，完成：1.TFRecord to example 2.int64 to int32
     train_input_fn = file_based_input_fn_builder(
         input_file=train_file,
         seq_length=FLAGS.max_seq_length,
@@ -946,9 +961,11 @@ def main(_):
     # However, if running eval on the TPU, you will need to specify the
     # number of steps.
     if FLAGS.use_tpu:
+        # 假定使用TPU时，前面整除处理已经成功，将得到eval_steps为整数值
       assert len(eval_examples) % FLAGS.eval_batch_size == 0
       eval_steps = int(len(eval_examples) // FLAGS.eval_batch_size)
 
+    # 如果使用tpu的话，删除剩余的部分（可能是无法整除的部分）
     eval_drop_remainder = True if FLAGS.use_tpu else False
     eval_input_fn = file_based_input_fn_builder(
         input_file=eval_file,
@@ -977,6 +994,8 @@ def main(_):
         predict_examples.append(PaddingInputExample())
 
     predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
+    # 1.调用convert_single_example转化Input_example为Feature_example
+    # 2.转换为TFRecord格式，便于大型数据处理
     file_based_convert_examples_to_features(predict_examples, label_list,
                                             FLAGS.max_seq_length, tokenizer,
                                             predict_file)
@@ -996,11 +1015,13 @@ def main(_):
 
     result = estimator.predict(input_fn=predict_input_fn)
 
+    # 写测试集预测结果文件
     output_predict_file = os.path.join(FLAGS.output_dir, "test_results.tsv")
     with tf.gfile.GFile(output_predict_file, "w") as writer:
       num_written_lines = 0
       tf.logging.info("***** Predict results *****")
       for (i, prediction) in enumerate(result):
+          # 写入probabilities的键值对，比如二分类：有预测为0的一列，预测为1的一列
         probabilities = prediction["probabilities"]
         if i >= num_actual_predict_examples:
           break

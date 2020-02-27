@@ -22,7 +22,7 @@ from gensim.models.word2vec import LineSentence
 
 from setting import DATA_PATH, LOG_PATH
 from utils.logger import Logger
-from preprocess.tools import read_json_format_file
+from preprocess.common_tools import read_json_format_file
 
 
 

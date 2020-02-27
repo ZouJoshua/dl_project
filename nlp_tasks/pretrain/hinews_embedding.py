@@ -12,8 +12,8 @@ import os
 import time
 from gensim.models import word2vec
 
-from preprocess.tools import split_text
-from preprocess.tools import read_json_format_file, read_txt_file
+from preprocess.common_tools import split_text
+from preprocess.common_tools import read_json_format_file, read_txt_file
 
 
 

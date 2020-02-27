@@ -1,4 +1,4 @@
-# 下载谷歌预训练模型，解压到当前文件（2019-06-27）
+# 谷歌预训练模型，解压到当前文件（2019-06-27）
 # 下载最近模型参考 https://github.com/google-research/bert/blob/master/README.md
 
 1.【BERT-Large, Uncased (Whole Word Masking)】:
@@ -59,3 +59,6 @@ word2idx链接: https://pan.baidu.com/s/1kX0xThl-OCFxZfojDQs_-w 提取码: sm1j
 【download】:
 模型链接: https://pan.baidu.com/s/1MFL3lj80I3i66-P1hr4yPA 提取码: k7tt
 word2idx链接: https://pan.baidu.com/s/1sOF5dKJRtU9ediiRXLe6Gw 提取码: ark9
+
+# 哈工大版的中文预训练BERT-wwm模型
+https://github.com/ymcui/Chinese-BERT-wwm
