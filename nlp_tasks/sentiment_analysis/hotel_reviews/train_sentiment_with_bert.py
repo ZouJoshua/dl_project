@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 2/21/20 6:55 PM
-@File    : train.py
+@File    : train_sentiment_with_bert.py
 @Desc    : 
 
 """
@@ -13,15 +13,13 @@ import os
 import json
 import tqdm
 import pandas as pd
-import numpy as np
 
-from torch.optim import Adam
 from torch.utils.data import DataLoader
 from sklearn import metrics
 
-from nlp_tasks.pretrain.sentiment_bert.sentiment_dataset import CLSDataset
-from nlp_tasks.pretrain.sentiment_bert.sentiment_classifier_v2 import *
-from nlp_tasks.pretrain.sentiment_bert.tools import *
+from nlp_tasks.sentiment_analysis.hotel_reviews.sentiment_dataset import CLSDataset
+from nlp_tasks.sentiment_analysis.hotel_reviews.sentiment_classifier_v2 import *
+from nlp_tasks.sentiment_analysis.hotel_reviews.tools import *
 from setting import CONFIG_PATH
 
 conf_file = os.path.join(CONFIG_PATH, "bert_model_config.ini")

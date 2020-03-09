@@ -78,12 +78,12 @@ with open("negative_samples.txt", "r", encoding="utf-8") as f:
 train_tokens = []
 for text in train_texts_orig:
     # 去掉标点
-    text = re.sub("[\s+\.\!\/_,$%^*(+\"\']+|[+——！，。？、~@#￥%……&*（）]+", "",text)
+    text = re.sub("[\s+\.\!\/_,$%^*(+\"\']+|[+——！，。？、~@#￥%……&*（）]+", "", text)
     # 结巴分词
     cut = jieba.cut(text)
     # 结巴分词的输出结果为一个生成器
     # 把生成器转换为list
-    cut_list = [ i for i in cut ]
+    cut_list = [i for i in cut]
     for i, word in enumerate(cut_list):
         try:
             # 将词转换为索引index

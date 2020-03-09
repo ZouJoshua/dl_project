@@ -11,7 +11,7 @@
 
 import torch
 from model_pytorch.sentiment_bert_model import BertModel, BertConfig
-from nlp_tasks.pretrain.sentiment_bert.inference_dataloader import preprocessing
+from nlp_tasks.sentiment_analysis.hotel_reviews.inference_dataloader import preprocessing
 import warnings
 import json
 import math

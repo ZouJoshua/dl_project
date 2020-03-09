@@ -15,8 +15,8 @@ import os
 import json
 import warnings
 
-from nlp_tasks.pretrain.sentiment_bert.inference_dataloader import preprocessing
-from nlp_tasks.pretrain.sentiment_bert.sentiment_classifier import *
+from nlp_tasks.sentiment_analysis.hotel_reviews.inference_dataloader import preprocessing
+from nlp_tasks.sentiment_analysis.hotel_reviews.sentiment_classifier import *
 from setting import CONFIG_PATH
 
 conf_file = os.path.join(CONFIG_PATH, "bert_model_config.ini")

@@ -24,7 +24,7 @@ from model_tensorflow.textcnn_model import TextCNN
 from tflearn.data_utils import pad_sequences
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 from gensim.models import KeyedVectors
-from preprocess.preprocess_data_en import DataSet
+from nlp_tasks.text_classification.en_news.preprocess_data_en import DataSet
 
 
 # data_dir = os.path.join(root_dir, "data", "en_news")

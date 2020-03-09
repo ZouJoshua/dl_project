@@ -27,8 +27,8 @@ class FastTextClassifier:
     """
 
     def __init__(self, model_path, args_config_file,
-                 args_section, train=False, model_name="classification.bin",
-                 data_path=None, logger=None):
+                 args_section, train=False, model_name="",
+                 data_path=None, name_mark="", logger=None):
         """
         初始化
         :param file_path: 训练数据路径
@@ -43,15 +43,23 @@ class FastTextClassifier:
             logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
             logging.root.setLevel(level=logging.INFO)
 
-        self.model_file = os.path.join(model_path, model_name)
+        if name_mark:
+            self.model_file = os.path.join(model_path, "{}classification.bin".format(name_mark))
+        else:
+            if model_name:
+                self.model_file = os.path.join(model_path, model_name)
+            else:
+                self.model_file = os.path.join(model_path, "classification.bin")
+
 
         if not train:
             self.model = self.load(self.model_file)
             assert self.model is not None, '训练模型无法获取'
         else:
             assert data_path is not None, '训练时, file_path不能为None'
-            self.train_file = os.path.join(data_path, 'train.txt')
-            self.test_file = os.path.join(data_path, 'test.txt')
+            self.train_file = os.path.join(data_path, '{}train.txt'.format(name_mark))
+            self.eval_file = os.path.join(data_path, '{}eval.txt'.format(name_mark))
+            self.test_file = os.path.join(data_path, '{}test.txt'.format(name_mark))
             self.model = self.train()
             self.save(quantize=False)
 
@@ -61,19 +69,28 @@ class FastTextClassifier:
         """
         args_dict = self.get_train_args(section=self.args_section)
         model = fasttext.train_supervised(**args_dict)
+
+        # 训练集
         train_result = model.test(self.train_file)
-        # self.print_results(*train_result)
         self.log.info('训练集准确率： \n样本数N\t{}\n精确率P\t{:.3f}\n召回率R\t{:.3f}'.format(*train_result))
         if detail:
             train_result_detail = model.test_label(self.train_file)
-            self.log.info('训练集各类别准确率： {}'.format(json.dumps(train_result_detail, indent=4)))
+            self.log.info('训练集各类别准确率： {}'.format(json.dumps(train_result_detail, ensure_ascii=False, indent=4)))
 
+        # 验证集
+        if os.path.exists(self.eval_file):
+            eval_result = model.test(self.eval_file)
+            self.log.info('验证集准确率： \n样本数N\t{}\n精确率P\t{:.3f}\n召回率R\t{:.3f}'.format(*eval_result))
+            if detail:
+                eval_result_detail = model.test_label(self.eval_file)
+                self.log.info('验证集各类别准确率： {}'.format(json.dumps(eval_result_detail, ensure_ascii=False, indent=4)))
+
+        # 测试集
         test_result = model.test(self.test_file)
-        # self.print_results(*test_result)
         self.log.info('测试集准确率: \n样本数N\t{}\n精确率P\t{:.3f}\n召回率R\t{:.3f}'.format(*test_result))
         if detail:
             test_result_detail = model.test_label(self.test_file)
-            self.log.info('测试集各类别准确率: {}'.format(json.dumps(test_result_detail, indent=4)))
+            self.log.info('测试集各类别准确率: {}'.format(json.dumps(test_result_detail, ensure_ascii=False, indent=4)))
 
         return model
 

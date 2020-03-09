@@ -14,10 +14,10 @@ from setting import DATA_PATH, CONFIG_PATH
 from model_normal.fasttext_model import FastTextClassifier
 from evaluate.eval_calculate import EvaluateModel
 
+from utils.logger import Logger
+from setting import LOG_PATH
 
-config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
-config_section = "fasttext.args_zh"
-corpus_path = os.path.join(DATA_PATH, "sogou")
+
 
 
 
@@ -36,6 +36,12 @@ class SogouCategoryModel(object):
 
 
 def main():
+
+    log_file = os.path.join(LOG_PATH, 'fasttext_train_log')
+    log = Logger("fasttext_train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
+    config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
+    config_section = "fasttext.args_zh"
+    corpus_path = os.path.join(DATA_PATH, "sogou")
     model = SogouCategoryModel(corpus_path, config_file, config_section, corpus_path)
 
 

@@ -11,6 +11,8 @@
 
 import os
 import sys
+import numpy as np
+import matplotlib.pyplot as plt
 import json
 import tqdm
 import random
@@ -69,7 +71,7 @@ def split_dataset(file):
     eval_file = os.path.join(corpus_dir, "thuc_news.eval.txt")
     test_file = os.path.join(corpus_dir, "thuc_news.test.txt")
     with open(file, "r", encoding='utf-8') as f, \
-            open(train_file,"w",encoding="utf-8") as train_f, \
+            open(train_file, "w", encoding="utf-8") as train_f, \
             open(eval_file, "w", encoding="utf-8") as eval_f, \
             open(test_file, "w", encoding="utf-8") as test_f:
         lines = f.readlines()
@@ -100,12 +102,48 @@ def split_dataset(file):
                 test_f.write(line)
 
 
+
+def plot_text_len(file):
+    """
+    文本长度可视化
+    :param file:
+    :return:
+    """
+    with open(file, "r", encoding='utf-8') as f:
+        lines = f.readlines()
+    # 获取所有文本的长度
+    all_length = [len(i.strip().split("__label__")[0].split(" ")) for i in lines]
+    # error_text = [i.strip().split("__label__")[0] for i in lines]
+    for i in lines:
+        a = i.strip().split("__label__")[0]
+        if len(a) < 5:
+            print(i)
+
+    print(all_length[:2])
+    # 可视化语料序列长度, 可见大部分文本的长度都在300以下
+    prop = np.mean(np.array(all_length) < 1000)
+    print("评论长度在1000以下的比例: {}".format(prop))
+
+    plt.hist(all_length, bins=500)
+    plt.show()
+
+
+
+
+
 def main():
     origin_dir = "/data/common/thucnews_data"
     corpus_dir = os.path.join(DATA_PATH, "corpus", "thuc_news")
     corpus_file = os.path.join(corpus_dir, "thuc_news.all.txt")
+    train_file = os.path.join(corpus_dir, "train.txt")
+
+    # 合并文件
     # merge_files(origin_dir, corpus_file)
-    split_dataset(corpus_file)
+    # 划分数据集
+    # split_dataset(corpus_file)
+    # 所有文本长度
+    plot_text_len(train_file)
+
 
 if __name__ == '__main__':
     main()
