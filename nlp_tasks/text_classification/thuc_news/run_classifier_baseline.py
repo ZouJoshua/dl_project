@@ -2,17 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 2/27/20 3:47 PM
-@File    : thuc_news_classifier.py
-@Desc    : 文本分类baseline
+@Time    : 3/13/20 5:52 PM
+@File    : run_classifier_baseline.py
+@Desc    : 文本分类baseline的训练\测试
 
 """
+
 
 import os
 from setting import DATA_PATH, CONFIG_PATH
 from model_normal.fasttext_model import FastTextClassifier
 from utils.logger import Logger
-from setting import LOG_PATH
 
 
 
@@ -63,4 +63,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
