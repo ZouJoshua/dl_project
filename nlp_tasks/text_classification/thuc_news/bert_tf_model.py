@@ -13,16 +13,25 @@ import os
 import tensorflow as tf
 from model_tensorflow.bert_model import modeling
 from model_tensorflow.bert_model import optimization
-
+import logging
 
 class BertClassifier(object):
+
     def __init__(self, config, is_training=True, num_train_step=None, num_warmup_step=None, logger=None):
+
         self.__bert_config_path = config.get("bert_config_file")
         self.__num_classes = config.getint("num_classes")
         self.__learning_rate = config.getfloat("learning_rate")
         self.__is_training = is_training
         self.__num_train_step = num_train_step
         self.__num_warmup_step = num_warmup_step
+
+        if logger:
+            self.log = logger
+        else:
+            self.log = logging.getLogger("bert_train_log")
+            logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
+            logging.root.setLevel(level=logging.INFO)
 
         self.input_ids = tf.placeholder(dtype=tf.int32, shape=[None, None], name='input_ids')
         self.input_masks = tf.placeholder(dtype=tf.int32, shape=[None, None], name='input_mask')
@@ -34,6 +43,7 @@ class BertClassifier(object):
 
 
     def built_model(self):
+
         bert_config = modeling.BertConfig.from_json_file(self.__bert_config_path)
 
         model = modeling.BertModel(config=bert_config,
@@ -42,7 +52,18 @@ class BertClassifier(object):
                                    input_mask=self.input_masks,
                                    token_type_ids=self.segment_ids,
                                    use_one_hot_embeddings=False)
-        output_layer = model.get_pooled_output()
+        # [batch_size, seq_length, embedding_size]
+        # output_layer = model.get_sequence_output()
+
+        # [batch_size, embedding_size]
+        # output_layer = model.get_pooled_output()
+
+        layer3_sequence_output = model.all_encoder_layers[2]
+        output_layer = tf.squeeze(layer3_sequence_output[:, 0:1, :], axis=1)
+        # self.log.info("******")
+        # self.log.info("{}".format(output_layer.shape))
+        # self.log.info("{}".format(output_layer))
+        # self.log.info("******")
 
         hidden_size = output_layer.shape[-1].value
         if self.__is_training:

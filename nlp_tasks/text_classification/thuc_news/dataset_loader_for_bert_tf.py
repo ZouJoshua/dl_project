@@ -14,6 +14,7 @@ import json
 import random
 from sklearn.utils import shuffle
 import tqdm
+import pickle
 import logging
 
 from model_tensorflow.bert_model import tokenization
@@ -46,12 +47,11 @@ class DatasetLoader(object):
             logging.root.setLevel(level=logging.INFO)
 
         self.vocab_file = config.get("vocab_file")
-        self.output_dir = config.get("output_dir")
         self.label2idx_path = config.get("label2idx_path")
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-        self._sequence_length = config.get("sequence_length")  # 每条输入的序列处理为定长
+        self._sequence_length = config.getint("sequence_length")  # 每条输入的序列处理为定长
         self.label_map = self.label_to_index()
+        self.tokenizer = tokenization.FullTokenizer(vocab_file=self.vocab_file, do_lower_case=True)
+
 
     @staticmethod
     def read_data(corpus_path, mode=None):
@@ -87,17 +87,16 @@ class DatasetLoader(object):
         :return:
         """
         features = []
-        tokenizer = tokenization.FullTokenizer(vocab_file=self.vocab_file, do_lower_case=True)
         for (i, line) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
             text, label = self._get_text_and_label(line)
-            feature = self.convert_single_example_to_feature(guid, tokenizer, text, label=label)
+            feature = self.convert_single_example_to_feature(guid, text, label=label)
             features.append(feature)
 
         return features
 
 
-    def convert_single_example_to_feature(self, guid, tokenizer, text, label=None):
+    def convert_single_example_to_feature(self, guid, text, label=None):
         text = tokenization.convert_to_unicode(text)
         if label:
             label = tokenization.convert_to_unicode(label)
@@ -105,13 +104,13 @@ class DatasetLoader(object):
         else:
             label_id = None
 
-        tokens = tokenizer.tokenize(text)
+        tokens = self.tokenizer.tokenize(text)
         tokens = ["[CLS]"] + tokens + ["[SEP]"]
-        input_id = tokenizer.convert_tokens_to_ids(tokens)
+        input_id = self.tokenizer.convert_tokens_to_ids(tokens)
         input_mask = [1] * len(input_id)
         segment_id = [0] * len(input_id)
 
-        if guid.split("-")[1] < 5:
+        if int(guid.split("-")[1]) < 5:
             self.log.info("*** Example ***")
             self.log.info("guid: %s" % (guid))
             self.log.info("tokens: %s" % " ".join(
@@ -162,15 +161,21 @@ class DatasetLoader(object):
 
         return pad_input_id, pad_input_mask, pad_segment_id
 
-    def gen_data(self, file_path, mode):
+    def gen_data(self, file_path, pkl_file, mode):
         """
         :param file_path:
         :param mode: train,eval,test
         :return:
         """
-        lines = self.read_data(file_path)
-        features = self.convert_examples_to_features(lines, set_type=mode)
-
+        if not os.path.exists(pkl_file):
+            self.log.info("*** Loading {} dataset from original file ***".format(mode))
+            lines = self.read_data(file_path, mode)
+            features = self.convert_examples_to_features(lines, set_type=mode)
+            self.dump_data(features, pkl_file)
+        else:
+            self.log.info("*** Loading {} dataset from serialized file ***".format(mode))
+            with open(pkl_file, 'rb') as file_obj:
+                features = pickle.load(file_obj)
         return features
 
     def next_batch(self, features, batch_size, mode="train"):
@@ -202,3 +207,15 @@ class DatasetLoader(object):
                        input_masks=batch_input_masks,
                        segment_ids=batch_segment_ids,
                        label_ids=batch_label_ids)
+
+    def dump_data(self, data, file):
+        """
+        序列化数据
+        :param data:
+        :param file:
+        :return:
+        """
+        self.log.info("*** Serialize features to file *** ")
+        outfile = open(file, "wb")
+        pickle.dump(data, outfile)
+        outfile.close()
