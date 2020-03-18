@@ -23,6 +23,11 @@ from nlp_tasks.text_classification.thuc_news.metrics import mean, get_multi_metr
 from setting import DATA_PATH, CONFIG_PATH
 from utils.logger import Logger
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "100"
+
+
+
 class Trainer(object):
     def __init__(self, config_file, logger=None):
 
@@ -141,7 +146,7 @@ class Trainer(object):
 
                     acc, recall, prec, f_beta = get_multi_metrics(pred_y=predictions, true_y=batch["label_ids"],
                                                                   labels=self.label_list)
-                    self.log.info("train: step: {}, loss: {}, acc: {}, recall: {}, precision: {}, f_beta: {}".format(
+                    self.log.info("train-step: {}, loss: {}, acc: {}, recall: {}, precision: {}, f_beta: {}".format(
                         current_step, loss, acc, recall, prec, f_beta))
 
                     current_step += 1
