@@ -19,9 +19,9 @@ class BertClassifier(object):
 
     def __init__(self, config, is_training=True, num_train_step=None, num_warmup_step=None, logger=None):
 
-        self.__bert_config_path = config.get("bert_config_file")
-        self.__num_classes = config.getint("num_classes")
-        self.__learning_rate = config.getfloat("learning_rate")
+        self.__bert_config_path = config.bert_config_path
+        self.__num_classes = config.num_classes
+        self.__learning_rate = config.learning_rate
         self.__is_training = is_training
         self.__num_train_step = num_train_step
         self.__num_warmup_step = num_warmup_step

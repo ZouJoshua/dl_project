@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 2/21/20 6:58 PM
-@File    : sentiment_bert_model.py
+@File    : bert_common_model.py
 @Desc    : PyTorch BERT model
 
 """

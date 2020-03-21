@@ -46,9 +46,9 @@ class DatasetLoader(object):
             logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
             logging.root.setLevel(level=logging.INFO)
 
-        self.vocab_file = config.get("vocab_file")
-        self.label2idx_path = config.get("label2idx_path")
-        self._sequence_length = config.getint("sequence_length")  # 每条输入的序列处理为定长
+        self.vocab_file = config.vocab_file
+        self.label2idx_path = config.label2idx_path
+        self._sequence_length = config.sequence_length  # 每条输入的序列处理为定长
         self.label_map = self.label_to_index()
         self.tokenizer = tokenization.FullTokenizer(vocab_file=self.vocab_file, do_lower_case=True)
 
@@ -118,7 +118,8 @@ class DatasetLoader(object):
             self.log.info("input_ids: %s" % " ".join([str(x) for x in input_id]))
             self.log.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
             self.log.info("segment_ids: %s" % " ".join([str(x) for x in segment_id]))
-            self.log.info("label: %s (id = %d)" % (label, label_id))
+            if label:
+                self.log.info("label: %s (id = %d)" % (label, label_id))
 
         pad_input_id, pad_input_mask, pad_segment_id = self.zero_padding(input_id, input_mask, segment_id)
 

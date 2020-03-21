@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, accuracy_score, recall_score, classification_report, confusion_matrix
 import logging
-from preprocess.tools import read_json_format_file
+from preprocess.common_tools import read_json_format_file
 
 
 class EvaluateModel(object):

@@ -9,6 +9,7 @@
 """
 
 from sklearn.metrics import roc_auc_score
+from sklearn.metrics import f1_score, accuracy_score, recall_score, classification_report, confusion_matrix
 
 
 def mean(item: list) -> float:
@@ -172,7 +173,7 @@ def get_binary_metrics(pred_y, true_y, f_beta=1.0):
     return acc, auc, recall, precision, f_beta
 
 
-def get_multi_metrics(pred_y, true_y, labels, f_beta=1.0):
+def get_custom_multi_metrics(pred_y, true_y, labels, f_beta=1.0):
     """
     得到多分类的性能指标
     :param pred_y:
@@ -186,3 +187,11 @@ def get_multi_metrics(pred_y, true_y, labels, f_beta=1.0):
     precision = multi_precision(pred_y, true_y, labels)
     f_beta = multi_f_beta(pred_y, true_y, labels, f_beta)
     return acc, recall, precision, f_beta
+
+
+def get_multi_metrics(true_y, pred_y):
+    acc = accuracy_score(true_y, pred_y)
+    recall = recall_score(true_y, pred_y, average='macro')
+    F1 = f1_score(true_y, pred_y, average='macro')
+
+    return acc, recall, F1

@@ -9,7 +9,8 @@
 """
 
 from torch import nn
-from model_pytorch.sentiment_bert_model import *
+import torch
+from model_pytorch.bert_common_model import BertConfig, BertModel
 
 """使用#CLS#对应的一条向量进行情感分析"""
 

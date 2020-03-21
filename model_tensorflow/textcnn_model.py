@@ -13,10 +13,160 @@
 
 
 import tensorflow as tf
+from model_tensorflow.basic_model import BaseModel
+import configparser
+
+
+class Config(object):
+    """CNN配置参数"""
+    def __init__(self, config_file, section=None):
+        config_ = configparser.ConfigParser()
+        config_.read(config_file)
+        if not config_.has_section(section):
+            raise Exception("Section={} not found".format(section))
+
+        self.all_params = {}
+        for i in config_.items(section):
+            self.all_params[i[0]] = i[1]
+
+        config = config_[section]
+        if not config:
+            raise Exception("Config file error.")
+        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
+        self.sequence_len = config.getint("sequence_len")                  # 序列长度
+        self.num_labels = config.getint("num_labels")                      # 类别数
+        self.num_filters = config.getint("num_filters")                    # 卷积核数目
+        self.vocab_size = config.getint("vocab_size")                      # 卷积核尺寸
+        self.hidden_dim = config.getint("hidden_dim")                      # 全连接层神经元
+        self.kernel_size = eval(config.get("kernel_size", "[3,4,5]"))      # 卷积核尺寸, a list of int. e.g. [3,4,5]
+        self.learning_rate = config.getfloat("learning_rate")
+        self.learning_decay_rate = config.getfloat("learning_decay_rate")
+        self.learning_decay_steps = config.getint("learning_decay_steps")
+        self.train_batch_size = config.getint("train_batch_size")
+        self.eval_batch_size = config.getint("eval_batch_size")
+        self.test_batch_size = config.getint("test_batch_size")
+        self.num_epochs = config.getint("num_epochs")
+        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")
+        self.eval_every_step = config.getint("eval_every_step")
+
+
+
+
+
+class TextCNN(BaseModel):
+    def __init__(self, config, vocab_size, word_vectors):
+        super(TextCNN, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
+
+        # 构建模型
+        self.build_model()
+        # 初始化保存模型的saver对象
+        self.init_saver()
+
+    def build_model(self):
+        self.embedding_layer()
+
+
+
+        # dropout
+        with tf.name_scope("dropout"):
+            h_drop = tf.nn.dropout(h_pool_flat, self.keep_prob)
+
+        # 全连接层的输出
+        with tf.name_scope("output"):
+            output_w = tf.get_variable(
+                "output_w",
+                shape=[num_filters_total, self.config["num_classes"]],
+                initializer=tf.contrib.layers.xavier_initializer())
+            output_b = tf.Variable(tf.constant(0.1, shape=[self.config["num_classes"]]), name="output_b")
+            self.l2_loss += tf.nn.l2_loss(output_w)
+            self.l2_loss += tf.nn.l2_loss(output_b)
+            self.logits = tf.nn.xw_plus_b(h_drop, output_w, output_b, name="logits")
+            self.predictions = self.get_predictions()
+
+        # 计算交叉熵损失
+        self.loss = self.cal_loss() + self.config["l2_reg_lambda"] * self.l2_loss
+        # 获得训练入口
+        self.train_op, self.summary_op = self.get_train_op()
+
+    def embedding_layer(self):
+        """
+        词嵌入层
+        :return:
+        """
+        with tf.name_scope("embedding"):
+            # 利用预训练的词向量初始化词嵌入矩阵
+            if self.word_vectors is not None:
+                embedding_w = tf.Variable(tf.cast(self.word_vectors, dtype=tf.float32, name="word2vec"),
+                                          name="embedding_w")
+            else:
+                embedding_w = tf.get_variable("embedding_w", shape=[self.vocab_size, self.config.embedding_dim],
+                                          initializer=tf.contrib.layers.xavier_initializer())
+
+            # 利用词嵌入矩阵将输入的数据中的词转换成词向量，
+            # 维度[batch_size, sequence_length, embedding_dim]
+            embedded_words = tf.nn.embedding_lookup(embedding_w, self.inputs)
+
+            # 卷积操作conv2d的输入是四维[batch_size, sequence_length, embedding_dim, channel],
+            # 分别代表着批处理大小、宽度、高度、通道数,因此需要增加维度,设为1,用tf.expand_dims来增大维度
+            self.embedded_words_expand = tf.expand_dims(embedded_words, -1)
+
+    def conv_maxpool_layer(self):
+        """
+        卷积池化层
+        :return:
+        """
+        # 创建卷积和池化层
+        pooled_outputs = []
+        # 有三种size的filter，3， 4， 5，textCNN是个多通道单层卷积的模型，可以看作三个单层的卷积模型的融合
+        for i, filter_size in enumerate(self.config.filter_sizes):
+            with tf.name_scope("conv-maxpool-%s" % filter_size):
+                # 卷积层，卷积核尺寸为filterSize * embeddingSize，卷积核的个数为numFilters
+                # 初始化权重矩阵和偏置
+                filter_shape = [filter_size, self.config["embedding_size"], 1, self.config["num_filters"]]
+                conv_w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="conv_w")
+                conv_b = tf.Variable(tf.constant(0.1, shape=[self.config["num_filters"]]), name="conv_b")
+                conv = tf.nn.conv2d(
+                    embedded_words_expand,
+                    conv_w,
+                    strides=[1, 1, 1, 1],
+                    padding="VALID",
+                    name="conv")
+
+                # relu函数的非线性映射
+                h = tf.nn.relu(tf.nn.bias_add(conv, conv_b), name="relu")
+                # 池化层，最大池化，池化是对卷积后的序列取一个最大值
+                pooled = tf.nn.max_pool(
+                    h,
+                    ksize=[1, self.config["sequence_length"] - filter_size + 1, 1, 1],
+                    # ksize shape: [batch, height, width, channels]
+                    strides=[1, 1, 1, 1],
+                    padding='VALID',
+                    name="pool")
+                pooled_outputs.append(pooled)  # 将三种size的filter的输出一起加入到列表中
+
+        # 得到CNN网络的输出长度
+        num_filters_total = self.config.num_filters * len(self.config.filter_sizes)
+
+        # 池化后的维度不变，按照最后的维度channel来concat
+        h_pool = tf.concat(pooled_outputs, 3)
+
+        # 摊平成二维的数据输入到全连接层
+        self.pool_flat_output = tf.reshape(h_pool, [-1, num_filters_total])
+
+
+    def full_connection_layer(self):
+        """
+        全连接层，后面接dropout以及relu激活
+        :return:
+        """
+
+
+
 
 
 class TextCNN(object):
     def __init__(self,
+                 config,
                  filter_sizes,
                  num_filters,
                  label_size,
@@ -72,10 +222,8 @@ class TextCNN(object):
         convolutional layer
         max-pooling
         softmax layer"""
-        self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)  # [None,sencente_len,embed_size]
-        # 因为卷积操作conv2d()需要输入的是四维数据，分别代表着批处理大小、宽度、高度、通道数。
-        # 而embedded_chars只有前三维，所以需要添加一维，设为1。变为：[input_x.shape[0], sequence_length, embedding_size, 1]
-        # [训练时一个batch的图片数量, 图片高度, 图片宽度, 图像通道数]
+        self.embedded_words = tf.nn.embedding_lookup(self.embedding, self.sentence)
+
         self.sentence_embeddings_expanded = tf.expand_dims(self.embedded_words, -1)  # [None,sencente_len,embed_size,1]
 
         # if self.use_mulitple_layer_cnn: # this may take 50G memory.

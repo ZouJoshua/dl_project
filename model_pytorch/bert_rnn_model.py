@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 3/19/20 5:00 PM
-@File    : bert_model.py
+@Time    : 3/19/20 5:21 PM
+@File    : bert_rnn_model.py
 @Desc    : 
 
 """
@@ -11,6 +11,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from model_pytorch.pretrained import BertModel, BertTokenizer
 
 
@@ -36,20 +37,30 @@ class Config(object):
         self.bert_path = './bert_pretrain'
         self.tokenizer = BertTokenizer.from_pretrained(self.bert_path)
         self.hidden_size = 768
+        self.filter_sizes = (2, 3, 4)                                   # 卷积核尺寸
+        self.num_filters = 256                                          # 卷积核数量(channels数)
+        self.dropout = 0.1
+        self.rnn_hidden = 768
+        self.num_layers = 2
 
 
-class Model(nn.Module):
+class BertRNNModel(nn.Module):
 
     def __init__(self, config):
-        super(Model, self).__init__()
+        super(BertRNNModel, self).__init__()
         self.bert = BertModel.from_pretrained(config.bert_path)
         for param in self.bert.parameters():
             param.requires_grad = True
-        self.fc = nn.Linear(config.hidden_size, config.num_classes)
+        self.lstm = nn.LSTM(config.hidden_size, config.rnn_hidden, config.num_layers,
+                            bidirectional=True, batch_first=True, dropout=config.dropout)
+        self.dropout = nn.Dropout(config.dropout)
+        self.fc_rnn = nn.Linear(config.rnn_hidden * 2, config.num_classes)
 
     def forward(self, x):
         context = x[0]  # 输入的句子
         mask = x[2]  # 对padding部分进行mask，和句子一个size，padding部分用0表示，如：[1, 1, 1, 1, 0, 0]
-        _, pooled = self.bert(context, attention_mask=mask, output_all_encoded_layers=False)
-        out = self.fc(pooled)
+        encoder_out, text_cls = self.bert(context, attention_mask=mask, output_all_encoded_layers=False)
+        out, _ = self.lstm(encoder_out)
+        out = self.dropout(out)
+        out = self.fc_rnn(out[:, -1, :])  # 句子最后时刻的 hidden state
         return out

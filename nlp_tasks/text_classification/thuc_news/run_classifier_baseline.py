@@ -11,7 +11,7 @@
 
 import os
 from setting import DATA_PATH, CONFIG_PATH
-from model_normal.fasttext_model import FastTextClassifier
+from model_normal.fasttext_model import FastTextClassifier, Config
 from utils.logger import Logger
 
 
@@ -21,15 +21,14 @@ class ThucCategoryModel(object):
 
     def __init__(self, model_path, config_file, config_section, corpus_path, log, name_mark):
         self.mp = model_path
-        self.cf = config_file
-        self.cs = config_section
         self.cp = corpus_path
         self.loger = log
         self.nm = name_mark
+        self.config = Config(config_file, section=config_section)
         self.model = self.train()
 
     def train(self):
-        model = FastTextClassifier(self.mp, self.cf, self.cs, train=True, data_path=self.cp, name_mark=self.nm, logger=self.loger).model
+        model = FastTextClassifier(self.mp, self.config, train=True, data_path=self.cp, name_mark=self.nm, logger=self.loger).model
         return model
 
 
@@ -42,7 +41,7 @@ def participle_train():
     log_file = os.path.join(model_path, 'train_log')
     log = Logger("fasttext_train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
     # jieba 分词训练版本
-    model = ThucCategoryModel(model_path, config_file, config_section, corpus_path, log)
+    ThucCategoryModel(model_path, config_file, config_section, corpus_path, log)
 
 
 def single_char_train():
@@ -53,7 +52,7 @@ def single_char_train():
     log_file = os.path.join(model_path, 'train_log')
     log = Logger("fasttext_train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
     # 单字训练版本
-    model = ThucCategoryModel(model_path, config_file, config_section, corpus_path, log, name_mark="single_char.")
+    ThucCategoryModel(model_path, config_file, config_section, corpus_path, log, name_mark="single_char.")
 
 
 def main():

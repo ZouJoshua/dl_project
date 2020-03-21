@@ -2,23 +2,21 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 3/19/20 5:00 PM
-@File    : bert_model.py
+@Time    : 3/19/20 4:53 PM
+@File    : ERNIE_model.py
 @Desc    : 
 
 """
-
 
 import torch
 import torch.nn as nn
 from model_pytorch.pretrained import BertModel, BertTokenizer
 
-
 class Config(object):
 
     """配置参数"""
     def __init__(self, dataset):
-        self.model_name = 'bert'
+        self.model_name = 'ERNIE'
         self.train_path = dataset + '/data/train.txt'                                # 训练集
         self.dev_path = dataset + '/data/dev.txt'                                    # 验证集
         self.test_path = dataset + '/data/test.txt'                                  # 测试集
@@ -33,15 +31,16 @@ class Config(object):
         self.batch_size = 128                                           # mini-batch大小
         self.pad_size = 32                                              # 每句话处理成的长度(短填长切)
         self.learning_rate = 5e-5                                       # 学习率
-        self.bert_path = './bert_pretrain'
+        self.bert_path = './ERNIE_pretrain'
         self.tokenizer = BertTokenizer.from_pretrained(self.bert_path)
+        print(self.tokenizer)
         self.hidden_size = 768
 
 
-class Model(nn.Module):
+class ERNIEModel(nn.Module):
 
     def __init__(self, config):
-        super(Model, self).__init__()
+        super(ERNIEModel, self).__init__()
         self.bert = BertModel.from_pretrained(config.bert_path)
         for param in self.bert.parameters():
             param.requires_grad = True

@@ -10,7 +10,8 @@
 
 
 from torch import nn
-from model_pytorch.sentiment_bert_model import *
+import torch
+from model_pytorch.bert_common_model import BertConfig, BertModel
 
 
 
