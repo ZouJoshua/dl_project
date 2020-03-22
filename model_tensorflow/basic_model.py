@@ -49,8 +49,13 @@ class BaseModel(object):
                                                                  labels=tf.reshape(self.labels, [-1, 1]))
             elif self.config.num_labels > 1:
                 self.labels = tf.cast(self.labels, dtype=tf.int32)
+                # 使用sparse_softmax_cross_entropy_with_logits时
+                # self.labels为从0开始编码的int32或int64,而且值范围是[0, num_labels)
                 losses = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits,
-                                                                        labels=self.labels)
+                                                                     labels=self.labels)
+                # 使用softmax_cross_entropy_with_logits时label的shape为[batch_size, classes],
+                # 也就是需要对label进行onehot编码
+                # losses=tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits)
             loss = tf.reduce_mean(losses)
             return loss
 
@@ -79,10 +84,14 @@ class BaseModel(object):
         trainable_params = tf.trainable_variables()
         gradients = tf.gradients(self.loss, trainable_params)
         # 对梯度进行梯度截断
-        clip_gradients, _ = tf.clip_by_global_norm(gradients, self.config["max_grad_norm"])
-        train_op = optimizer.apply_gradients(zip(clip_gradients, trainable_params))
+        clip_gradients, _ = tf.clip_by_global_norm(gradients, self.config.max_grad_norm)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_op = optimizer.apply_gradients(zip(clip_gradients, trainable_params))
 
         tf.summary.scalar("loss", self.loss)
+        # tf.summary.scalar("accuracy", self.accuracy)
+
         summary_op = tf.summary.merge_all()
 
         return train_op, summary_op
@@ -96,8 +105,11 @@ class BaseModel(object):
         if self.config.num_labels == 1:
             predictions = tf.cast(tf.greater_equal(self.logits, 0.0), tf.int32, name="predictions")
         elif self.config.num_labels > 1:
-            predictions = tf.argmax(self.logits, axis=-1, name="predictions")
+            # predictions = tf.argmax(self.logits, axis=-1, name="predictions")
+            predictions = tf.argmax(tf.nn.softmax(self.logits), -1, name="predictions")  # 预测类别
+
         return predictions
+
 
     def build_model(self):
         """
