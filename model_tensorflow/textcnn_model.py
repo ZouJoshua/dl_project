@@ -61,11 +61,11 @@ class Config(object):
 
 
 class TextCNN(BaseModel):
+
     def __init__(self, config, vocab_size, word_vectors):
         super(TextCNN, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
 
         self.num_filters_total = self.config.num_filters * len(self.config.filter_sizes)
-        self.global_step = tf.Variable(0, trainable=False, name="global_step")
         self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
         self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
 
@@ -73,7 +73,6 @@ class TextCNN(BaseModel):
         self.build_model()
         # 初始化保存模型的saver对象
         self.init_saver()
-
 
 
 
@@ -239,9 +238,11 @@ class TextCNN(BaseModel):
     def cal_loss(self):
         with tf.name_scope("loss"):
             # 计算交叉熵损失
+            self.labels = tf.cast(self.labels, dtype=tf.int32)
             losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits)
             loss = tf.reduce_mean(losses)
 
             # self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.config.l2_reg_lambda
             # self.loss = loss + self.l2_loss
             self.loss = loss + self.config.l2_reg_lambda * self.l2_loss
+

@@ -25,11 +25,11 @@ class BaseModel(object):
         self.vocab_size = vocab_size
         self.word_vectors = word_vectors
         self.inputs = tf.placeholder(tf.int32, [None, None], name="inputs")            # 数据输入
-        self.labels = tf.placeholder(tf.float32, [None], name="labels")                # 标签
+        self.labels = tf.placeholder(tf.int32, [None], name="labels")                # 标签
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")                  # dropout
 
         self.l2_loss = tf.constant(0.0)                     # 定义l2损失
-        self.global_step = tf.Variable(0, trainable=False)
+        self.global_step = tf.Variable(0, trainable=False, name="global_step")
         self.loss = 0.0                                     # 损失
         self.train_op = None                                # 训练入口
         self.summary_op = None
@@ -99,7 +99,7 @@ class BaseModel(object):
         clip_gradients, _ = tf.clip_by_global_norm(gradients, self.config.max_grad_norm)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            train_op = optimizer.apply_gradients(zip(clip_gradients, trainable_params))
+            train_op = optimizer.apply_gradients(zip(clip_gradients, trainable_params), global_step=self.global_step)
 
         tf.summary.scalar("loss", self.loss)
         # tf.summary.scalar("accuracy", self.accuracy)
@@ -152,9 +152,9 @@ class BaseModel(object):
                      self.keep_prob: dropout_prob}
 
         # 训练模型
-        _, summary, loss, predictions = sess.run([self.train_op, self.summary_op, self.loss, self.predictions],
+        _, summary, step, loss, predictions = sess.run([self.train_op, self.summary_op, self.global_step, self.loss, self.predictions],
                                                  feed_dict=feed_dict)
-        return summary, loss, predictions
+        return summary, step, loss, predictions
 
     def eval(self, sess, batch):
         """
@@ -167,8 +167,8 @@ class BaseModel(object):
                      self.labels: batch["y"],
                      self.keep_prob: 1.0}
 
-        summary, loss, predictions = sess.run([self.summary_op, self.loss, self.predictions], feed_dict=feed_dict)
-        return summary, loss, predictions
+        summary, step, loss, predictions = sess.run([self.summary_op, self.global_step, self.loss, self.predictions], feed_dict=feed_dict)
+        return summary, step, loss, predictions
 
     def infer(self, sess, inputs):
         """

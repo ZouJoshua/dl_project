@@ -12,9 +12,10 @@
 
 
 class PredictorBase(object):
+
     def __init__(self, config):
 
-        self.output_path = config.get("output_dir")
+        self.output_path = None
 
     def load_vocab(self):
         """

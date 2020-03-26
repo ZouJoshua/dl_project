@@ -416,7 +416,8 @@ def write_file_with_predict():
                         out["guid"] = "{}-{}".format(file_type, ids[j])
                         out["true_label"] = true_labels[j]
                         out["predict_label"] = predict_labels[j]
-                        wf.write(json.dumps(out, ensure_ascii=False) + "\n")
+                        if out:
+                            wf.write(json.dumps(out, ensure_ascii=False) + "\n")
 
 
 
