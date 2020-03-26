@@ -44,10 +44,22 @@ class BaseModel(object):
         """
         with tf.name_scope("loss"):
             losses = 0.0
-            if self.config.num_labels == 1:
+            if self.config.num_labels == 0:
+                # 多标签分类损失函数
+                zeros = tf.zeros_like(self.logits, dtype=self.logits.dtype)  # [batch_size, num_classes]
+                cond = (self.logits >= zeros)  # [batch_size, num_classes]
+                relu_logits = tf.where(cond, self.logits, zeros)  # [batch_size, num_classes]
+                neg_abs_logits = tf.where(cond, -self.logits, self.logits)  # [batch_size, num_classes]
+
+                # [batch_size, num_classes]
+                losses = tf.math.add(relu_logits - self.logits * self.labels, tf.math.log1p(tf.math.exp(neg_abs_logits)))
+                # losses = tf.reduce_sum(losses, axis=1) / tf.reduce_sum(self.labels, axis=1)
+            elif self.config.num_labels == 1:
+                # 二分类损失函数计算
                 losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
                                                                  labels=tf.reshape(self.labels, [-1, 1]))
             elif self.config.num_labels > 1:
+                # 多分类损失函数计算
                 self.labels = tf.cast(self.labels, dtype=tf.int32)
                 # 使用sparse_softmax_cross_entropy_with_logits时
                 # self.labels为从0开始编码的int32或int64,而且值范围是[0, num_labels)

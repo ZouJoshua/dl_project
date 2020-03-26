@@ -29,27 +29,33 @@ class Config(object):
         config = config_[section]
         if not config:
             raise Exception("Config file error.")
-        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
-        self.sequence_len = config.getint("sequence_len")                  # 序列长度
+        self.data_path = config.get("data_path")                           # 数据目录
+        self.label2idx_path = config.get("label2idx_path")                 # label映射文件
+        self.pretrain_embedding = config.get("pretrain_embedding")         # 预训练词向量文件
+        self.stopwords_path = config.get("stopwords_path", "")             # 停用词文件
+        self.output_path = config.get("output_path")                       # 输出目录(模型文件\)
+        self.ckpt_model_path = config.get("ckpt_model_path", "")           # 模型目录
+        self.sequence_length = config.getint("sequence_length")            # 序列长度
         self.num_labels = config.getint("num_labels")                      # 类别数,二分类时置为1,多分类时置为实际类别数
+        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
+        self.vocab_size = config.getint("vocab_size")                      # 字典大小
         self.num_filters = config.getint("num_filters")                    # 卷积核数目
-        self.vocab_size = config.getint("vocab_size")                      # 卷积核尺寸
         self.hidden_dim = config.getint("hidden_dim")                      # 全连接层神经元
-        self.kernel_size = eval(config.get("kernel_size", "[3,4,5]"))      # 卷积核尺寸, a list of int. e.g. [3,4,5]
-        self.is_training = config.getboolean("is_training")
+        self.filter_sizes = eval(config.get("filter_sizes", "[3,4,5]"))    # 卷积核尺寸, a list of int. e.g. [3,4,5]
+        self.is_training = config.getboolean("is_training", False)
+        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
         self.optimization = config.get("optimization", "adam")             # 优化算法
         self.learning_rate = config.getfloat("learning_rate")              # 学习速率
         self.learning_decay_rate = config.getfloat("learning_decay_rate")
         self.learning_decay_steps = config.getint("learning_decay_steps")
-        self.l2_reg_lambda = config.getfloat("l2_reg_lambda")              # L2正则化的系数，主要对全连接层的参数正则化
+        self.l2_reg_lambda = config.getfloat("l2_reg_lambda", 0.0)              # L2正则化的系数，主要对全连接层的参数正则化
         self.max_grad_norm = config.getfloat("max_grad_norm", 5.0)         # 梯度阶段临界值
-        self.train_batch_size = config.getint("train_batch_size")
-        self.eval_batch_size = config.getint("eval_batch_size")
-        self.test_batch_size = config.getint("test_batch_size")
         self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
-        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
+        self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
+        self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
+        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
         self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
-
+        self.model_name = config.get("model_name", "textcnn")              # 模型名称
 
 
 
@@ -74,6 +80,7 @@ class TextCNN(BaseModel):
     def build_model(self):
         self.embedding_layer()
         self.conv_maxpool_layer()
+        # self.multi_conv_maxpool_layer()
         self.full_connection_layer()
         self.cal_loss()
 
@@ -131,13 +138,13 @@ class TextCNN(BaseModel):
 
                 # relu函数的非线性映射
                 # 卷积层的输出h，即每个feature map
-                # shape:[batch_size,sequence_len - filter_size + 1,1,num_filters]
+                # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
                 h = tf.nn.relu(tf.nn.bias_add(conv, conv_b), name="relu")
                 # 池化层
                 # 最大池化，池化是对卷积后的序列取一个最大值,本质上是一个特征向量，最后一个维度是特征代表数量
                 pooled = tf.nn.max_pool(
                     h,
-                    ksize=[1, self.config.sequence_len - filter_size + 1, 1, 1],  # ksize shape: [batch, height, width, channels],一般为[1,height,width,1]，batch和channels上不池化
+                    ksize=[1, self.config.sequence_length - filter_size + 1, 1, 1],  # ksize shape: [batch, height, width, channels],一般为[1,height,width,1]，batch和channels上不池化
                     strides=[1, 1, 1, 1],
                     padding='VALID',
                     name="pool")  # shape: [batch_size, 1, 1, num_filters]
@@ -176,10 +183,10 @@ class TextCNN(BaseModel):
                     conv_filter,
                     strides=[1, 1, 1, 1],
                     padding="SAME",
-                    name="conv")  # shape:[batch_size,sequence_len - filter_size + 1,1,num_filters]
+                    name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
                 conv = tf.contrib.layers.batch_norm(conv, is_training=self.config.is_training, scope='cnn1')
                 h = tf.nn.relu(tf.nn.bias_add(conv, conv_b), "relu")  # shape: [batch_size,sequence_length,1,num_filters]
-                h = tf.reshape(h, [-1, self.config.sentence_len, self.config.num_filters, 1])  # shape: [batch_size,sequence_length,num_filters,1]
+                h = tf.reshape(h, [-1, self.config.sequence_length, self.config.num_filters, 1])  # shape: [batch_size,sequence_length,num_filters,1]
 
 
                 # Layer2:
@@ -198,7 +205,7 @@ class TextCNN(BaseModel):
                 h = tf.nn.relu(tf.nn.bias_add(conv2, conv_b2), "relu2")  # shape:[batch_size,sequence_length,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
 
                 # Max-pooling
-                pooling_max = tf.squeeze(tf.nn.max_pool(h, ksize=[1, self.config.sentence_len, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name="pool"))
+                pooling_max = tf.squeeze(tf.nn.max_pool(h, ksize=[1, self.config.sequence_length, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name="pool"))
                 # pooling_avg=tf.squeeze(tf.reduce_mean(h,axis=1))     # [batch_size,num_filters]
                 # pooling=tf.concat([pooling_max,pooling_avg],axis=1)  # [batch_size,num_filters*2]
                 pooled_outputs.append(pooling_max)  # [batch_size,num_filters]

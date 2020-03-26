@@ -74,6 +74,8 @@ class Trainer(object):
 
         self.config = config
 
+        self.data_obj = None
+        self.model = None
         self.bert_init_checkpoint = config.bert_init_checkpoint
 
         # 加载数据集
@@ -256,7 +258,7 @@ class Predictor(object):
         """
         self.model = BertClassifier(config=self.config, is_training=False, logger=self.log)
 
-    def predict(self, text, ):
+    def predict(self, text):
         """
         给定分词后的句子，预测其分类结果
         :param text:

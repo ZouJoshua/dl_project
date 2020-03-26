@@ -54,15 +54,15 @@ class DatasetLoader(object):
 
 
     @staticmethod
-    def read_data(corpus_path, mode=None):
+    def read_data(corpus_file, mode=None):
         """
         加载语料, 读取数据
-        :param corpus_path:
+        :param corpus_file:
         :param mode: train,eval,test
         :return:
         """
 
-        with open(corpus_path, "r", encoding="utf-8") as f:
+        with open(corpus_file, "r", encoding="utf-8") as f:
             # 将数据集全部加载到内存
             lines = [eval(line) for line in tqdm.tqdm(f, desc="Loading {} dataset".format(mode))]
             # 打乱顺序
