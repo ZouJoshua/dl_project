@@ -10,7 +10,7 @@
 
 
 import torch
-from model_pytorch.sentiment_bert_model import BertModel, BertConfig
+from model_pytorch.bert_common_model import BertModel, BertConfig
 from nlp_tasks.sentiment_analysis.hotel_reviews.inference_dataloader import preprocessing
 import warnings
 import json

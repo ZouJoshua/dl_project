@@ -22,7 +22,7 @@ from matplotlib.font_manager import FontProperties
 import plotly.graph_objs as go
 from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
 
-from model_pytorch.bert_model import BertModel, BertConfig
+from model_pytorch.bert_base_model import BertModel, BertConfig
 from nlp_tasks.pretrain.zhwiki_bert.inference_dataloader import preprocessing
 from setting import DATA_PATH, CONFIG_PATH
 
@@ -41,7 +41,7 @@ class Pretrainer:
         # 加载配置文件
         config_ = configparser.ConfigParser()
         config_.read(config_path)
-        self.config = config_["DEFAULT"]
+        self.config = config_["ZHWIKI_PRETRAIN"]
         # 词量, 注意在这里实际字(词)汇量 = vocab_size - 20,
         # 因为前20个token用来做一些特殊功能, 如padding等等
         self.vocab_size = int(self.config["vocab_size"])
@@ -121,7 +121,7 @@ class Pretrainer:
                                                          positional_enc=positional_enc,
                                                          get_attention_matrices=True)
             # 因为batch size=1所以直接返回每层的注意力矩阵
-            return [i.detach().numpy() for i in attention_matrices]
+            return [i.detach().cpu().numpy() for i in attention_matrices]
 
 
 
@@ -138,6 +138,7 @@ class Pretrainer:
         labels = [i + " " for i in list(text)]
         labels = ["#CLS# ", ] + labels + ["#SEP# ", ]
         plt.figure(figsize=(8, 8))
+        # print(attention_matrices[layer_num][0][head_num])
         plt.imshow(attention_matrices[layer_num][0][head_num])
         plt.yticks(range(len(labels)), labels, fontproperties=font, fontsize=18)
         plt.xticks(range(len(labels)), labels, fontproperties=font, fontsize=18)
@@ -186,7 +187,7 @@ def plot_auc(df_log_pickle_file):
 if __name__ == '__main__':
     model = Pretrainer(max_seq_len=256,
                        batch_size=1,
-                       with_cuda=True
+                       with_cuda=False
                        )
     text = "为什么要上班"
     # text = "历史上的今天发生了什么事？"
