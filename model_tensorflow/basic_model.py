@@ -77,12 +77,14 @@ class BaseModel(object):
         :return:
         """
         optimizer = None
+        if self.config.optimization == "sgd":
+            optimizer = tf.train.GradientDescentOptimizer(self.config.learning_rate)
+        if self.config.optimization == "momentum":
+            optimizer = tf.train.MomentumOptimizer(self.config.learning_rate, 0.9)
         if self.config.optimization == "adam":
             optimizer = tf.train.AdamOptimizer(self.config.learning_rate)
         if self.config.optimization == "rmsprop":
             optimizer = tf.train.RMSPropOptimizer(self.config.learning_rate)
-        if self.config.optimization == "sgd":
-            optimizer = tf.train.GradientDescentOptimizer(self.config.learning_rate)
         return optimizer
 
     def get_train_op(self):

@@ -13,12 +13,14 @@ import json
 import os
 import argparse
 import pickle
+from importlib import import_module
 
 import tensorflow as tf
 from model_tensorflow.basic_train import TrainerBase
 from model_tensorflow.basic_predict import PredictorBase
 from nlp_tasks.text_classification.thuc_news.dataset_loader_for_multi_models import DatasetLoader
-from model_tensorflow.textcnn_model import TextCNN, Config
+from model_tensorflow.textcnn_model import TextCNN
+from model_tensorflow.textrcnn_model import RCNNModel
 from evaluate.metrics import get_binary_metrics, get_multi_metrics, mean, get_custom_multi_metrics
 
 import logging
@@ -84,8 +86,8 @@ class Trainer(TrainerBase):
         #     self.model = BiLstmModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
         # elif self.config["model_name"] == "bilstm_atten":
         #     self.model = BiLstmAttenModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
-        # elif self.config["model_name"] == "rcnn":
-        #     self.model = RcnnModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
+        elif self.config.model_name == "textrcnn":
+            self.model = RCNNModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         # elif self.config["model_name"] == "transformer":
         #     self.model = TransformerModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
 
@@ -94,7 +96,7 @@ class Trainer(TrainerBase):
         训练模型
         :return:
         """
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8, allow_growth=True)
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7, allow_growth=True)
         sess_config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True, gpu_options=gpu_options)
         with tf.Session(config=sess_config) as sess:
             # 初始化变量值
@@ -274,8 +276,8 @@ class Predictor(PredictorBase):
         #     self.model = BiLstmModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
         # elif self.config["model_name"] == "bilstm_atten":
         #     self.model = BiLstmAttenModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
-        # elif self.config["model_name"] == "rcnn":
-        #     self.model = RcnnModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
+        elif self.config.model_name == "textrcnn":
+            self.model = RCNNModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         # elif self.config["model_name"] == "transformer":
         #     self.model = TransformerModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
 
@@ -292,34 +294,47 @@ class Predictor(PredictorBase):
         return label
 
 
+    def predict_batch(self, sentences):
 
-def textcnn_train_model():
+        sentences_ids = list()
+        for sentence in sentences:
+            sentence_ids = self.sentence_to_idx(sentence)
+            sentences_ids.append(sentence_ids)
+        predictions = self.model.infer(self.sess, sentences_ids).tolist()
+        labels = [self.index2label[pre] for pre in predictions]
+        return labels
+
+def get_model_config(model_name="textcnn"):
+    x = import_module('model_tensorflow.{}_model'.format(model_name))
+    conf_file = os.path.join(CONFIG_PATH, "{}.ini".format(model_name))
+    config = x.Config(conf_file, section="THUC_NEWS")
+    return config
+
+
+def train_model(config):
     """
-    textcnn训练模型
+    训练模型
     :return:
     """
-    conf_file = os.path.join(CONFIG_PATH, "textcnn.ini")
-    config = Config(conf_file, section="THUC_NEWS")
     output = config.output_path
     if not os.path.exists(output):
         os.makedirs(output)
-    log_file = os.path.join(output, 'textcnn_train_log')
+    log_file = os.path.join(output, '{}_train_log'.format(config.model_name))
     log = Logger("train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
     log.info(json.dumps(config.all_params, indent=4))
     trainer = Trainer(config, logger=log)
     trainer.train()
 
-def textcnn_predict_to_file():
+
+def predict_to_file(config):
     """
-    textcnn预测验证
+    预测验证
     :return:
     """
     import time
-    conf_file = os.path.join(CONFIG_PATH, "textcnn.ini")
-    config = Config(conf_file, section="THUC_NEWS")
     output = config.output_path
-    log_file = os.path.join(output, 'textcnn_predict_log')
+    log_file = os.path.join(output, '{}_predict_log'.format(config.model_name))
 
     log = Logger("train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
@@ -329,19 +344,52 @@ def textcnn_predict_to_file():
     # files = [os.path.join(config.data_path, "thuc_news.{}.txt".format(i)) for i in ["test"]]
     predict_file = os.path.join(output, "thuc_news.predict.txt")
     e = time.time()
+    batch_size = 128
     with open(predict_file, "w", encoding="utf-8") as wf:
         for file in files:
             file_type = os.path.split(file)[1].split(".")[1]
             with open(file, "r", encoding="utf-8") as f:
                 lines = f.readlines()
-                for i, _line in enumerate(lines):
-                    line = json.loads(_line.strip())
-                    out = dict()
-                    out["guid"] = "{}-{}".format(file_type, i)
-                    out["true_label"] = line["label"]
-                    out["predict_label"] = predictor.predict(line["text"])
-                    if out:
-                        wf.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+                num_batches = len(lines) // batch_size
+                for i in range(num_batches + 1):
+                    start = i * batch_size
+                    end = start + batch_size
+                    text_batch = list()
+                    true_labels = list()
+                    ids = list()
+                    if end > len(lines):
+                        _lines = lines[start:]
+                    else:
+                        _lines = lines[start:end]
+
+                    for i, _line in enumerate(_lines):
+                        line = json.loads(_line.strip())
+                        ids.append(start + i)
+                        true_labels.append(line["label"])
+                        text_batch.append(line["text"])
+
+                    predict_labels = predictor.predict_batch(text_batch)
+                    for j, _ in enumerate(predict_labels):
+                        out = dict()
+                        out["guid"] = "{}-{}".format(file_type, ids[j])
+                        out["true_label"] = true_labels[j]
+                        out["predict_label"] = predict_labels[j]
+                        if out:
+                            wf.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+                    if i % 100 == 0:
+                        log.info("已处理{}条".format(i * batch_size))
+
+                # 预测单条
+                # for i, _line in enumerate(lines):
+                #     line = json.loads(_line.strip())
+                #     out = dict()
+                #     out["guid"] = "{}-{}".format(file_type, i)
+                #     out["true_label"] = line["label"]
+                #     out["predict_label"] = predictor.predict(line["text"])
+                #     if out:
+                #         wf.write(json.dumps(out, ensure_ascii=False) + "\n")
     s = time.time()
     log.info("*** 预测完成")
     log.info("预测耗时: {}s".format(s - e))
@@ -396,8 +444,13 @@ def predict_report(file, log):
 
 
 def main():
-    # textcnn_train_model()
-    textcnn_predict_to_file()
+    """
+    model_name = <"textcnn", "textrcnn", "char_cnn">
+    :return:
+    """
+    config = get_model_config(model_name="textrcnn")
+    # train_model(config)
+    predict_to_file(config)
 
 
 if __name__ == "__main__":
