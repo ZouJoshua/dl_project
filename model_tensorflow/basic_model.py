@@ -39,7 +39,7 @@ class BaseModel(object):
 
     def cal_loss(self):
         """
-        计算损失，支持二分类和多分类
+        计算损失，支持二分类和多分类,多标签分类
         :return:
         """
         with tf.name_scope("loss"):

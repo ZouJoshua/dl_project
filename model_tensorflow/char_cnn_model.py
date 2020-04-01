@@ -96,6 +96,7 @@ class CharCNN(BaseModel):
     def __init__(self, config, vocab_size, word_vectors):
         super(CharCNN, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
 
+        self.inputs = tf.placeholder(tf.int32, [None, config.sequence_length], name="inputs")
         self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
         self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
 
@@ -206,6 +207,7 @@ class CharCNN(BaseModel):
                     padding="VALID",
                     name="conv-{}".format(i + 1))
 
+                # print(conv.shape)
                 # 加上偏差,可以直接加上relu函数,
                 # 因为tf.nn.conv2d事实上是做了一个卷积运算，然后在这个运算结果上加上偏差，再导入到relu函数中
                 h = tf.nn.relu(tf.nn.bias_add(conv, conv_b), name="relu")
@@ -223,7 +225,9 @@ class CharCNN(BaseModel):
 
                 # 对维度进行转换，转换成卷积层的输入维度
                 self.embedded_words_expand = tf.transpose(h_pool, [0, 1, 3, 2], name="transpose")
-        # print(self.embedded_words_expand)
+            # print(self.embedded_words_expand.shape)
+            # print(self.embedded_words_expand.get_shape())
+
 
         with tf.name_scope("reshape"):
             fc_dim = self.embedded_words_expand.get_shape()[1].value * self.embedded_words_expand.get_shape()[2].value

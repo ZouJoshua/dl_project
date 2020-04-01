@@ -10,125 +10,125 @@
 
 import tensorflow as tf
 
+from model_tensorflow.basic_model import BaseModel
+import configparser
 
-class FastText(object):
-    
-    def __init__(self,
-                 label_size,
-                 learning_rate,
-                 learning_decay_rate,
-                 learning_decay_steps,
-                 batch_size,
-                 num_sampled,
-                 dropout_keep_prob,
-                 sentence_len,
-                 vocab_size,
-                 embed_size,
-                 is_training):
-        self.label_size = label_size  # num of classes
-        self.learning_rate = learning_rate
-        self.learning_rate = learning_rate
-        self.learning_decay_rate = learning_decay_rate
-        self.learning_decay_steps = learning_decay_steps
-        self.vocab_size = vocab_size
-        self.dropout_keep_prob = dropout_keep_prob
-        self.embedding_dims = embed_size
-        self.batch_size = batch_size
-        self.num_sampled = num_sampled
-        self.sentence_len = sentence_len
-        self.is_training = is_training
-        self.initializer = tf.random_normal_initializer(stddev=0.1)
 
-        self.sentence = tf.placeholder(tf.int32, [None, self.sentence_len], name="sentence")   # X
-        self.label = tf.placeholder(tf.int32, [None], name="label")  # Y
+class Config(object):
+    """Fasttext配置参数"""
+    def __init__(self, config_file, section=None):
+        config_ = configparser.ConfigParser()
+        config_.read(config_file)
+        if not config_.has_section(section):
+            raise Exception("Section={} not found".format(section))
 
-        self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
-        self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
-        self.global_step = tf.Variable(0, trainable=False, name="global_step")
+        self.all_params = {}
+        for i in config_.items(section):
+            self.all_params[i[0]] = i[1]
 
-        self.init_weights()
-        self.logits = self.inference()
-        self.loss_val = self.l2_loss()
-        self.train_op = self.train()
-        self.accuracy = self.acc()
+        config = config_[section]
+        if not config:
+            raise Exception("Config file error.")
+        self.data_path = config.get("data_path")                           # 数据目录
+        self.label2idx_path = config.get("label2idx_path")                 # label映射文件
+        self.pretrain_embedding = config.get("pretrain_embedding")         # 预训练词向量文件
+        self.stopwords_path = config.get("stopwords_path", "")             # 停用词文件
+        self.output_path = config.get("output_path")                       # 输出目录(模型文件\)
+        self.ckpt_model_path = config.get("ckpt_model_path", "")           # 模型目录
+        self.sequence_length = config.getint("sequence_length")            # 序列长度
+        self.num_labels = config.getint("num_labels")                      # 类别数,二分类时置为1,多分类时置为实际类别数
+        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
+        self.vocab_size = config.getint("vocab_size")                      # 字典大小
+        self.is_training = config.getboolean("is_training", False)
+        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
+        self.optimization = config.get("optimization", "adam")             # 优化算法
+        self.learning_rate = config.getfloat("learning_rate")              # 学习速率
+        self.learning_decay_rate = config.getfloat("learning_decay_rate")
+        self.learning_decay_steps = config.getint("learning_decay_steps")
+        self.l2_reg_lambda = config.getfloat("l2_reg_lambda", 0.0)              # L2正则化的系数，主要对全连接层的参数正则化
+        self.max_grad_norm = config.getfloat("max_grad_norm", 5.0)         # 梯度阶段临界值
+        self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
+        self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
+        self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
+        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
+        self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
+        self.model_name = config.get("model_name", "fasttext")              # 模型名称
 
-    def init_weights(self):
-        with tf.name_scope("embedding"):
-            self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dims], initializer=self.initializer)
-        self.w = tf.get_variable("w", [self.embedding_dims, self.label_size], initializer=self.initializer)
-        self.b = tf.get_variable("b", [self.label_size])
 
-    def inference(self):
-        """计算图：embedding -> average -> linear classifier"""
-        embedding_inputs = tf.nn.embedding_lookup(self.embedding, self.sentence)
+class Fasttext(BaseModel):
 
+    def __init__(self, config, vocab_size, word_vectors):
+        super(Fasttext, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
+
+        # 构建模型
+        self.build_model()
+        # 初始化保存模型的saver对象
+        self.init_saver()
+
+    def build_model(self):
+        self.embedding_layer()
+        self.full_connection_layer()
+        self.cal_loss()
+
+        self.predictions = self.get_predictions()
+        # 获得训练入口
+        self.train_op, self.summary_op = self.get_train_op()
+
+    def embedding_layer(self):
+        """
+        词嵌入层
+        :return:
+        """
+        with tf.name_scope("embedding-layer"):
+            # 利用预训练的词向量初始化词嵌入矩阵
+            if self.word_vectors is not None:
+                embedding_w = tf.Variable(tf.cast(self.word_vectors, dtype=tf.float32, name="word2vec"),
+                                          name="embedding_w")
+            else:
+                embedding_w = tf.get_variable("embedding_w", shape=[self.vocab_size, self.config.embedding_dim],
+                                          initializer=tf.contrib.layers.xavier_initializer())
+
+            # 利用词嵌入矩阵将输入的数据中的词转换成词向量，
+            # 维度[batch_size, sequence_length, embedding_dim]
+            self.embedded_words = tf.nn.embedding_lookup(embedding_w, self.inputs)
+            # 对词向量进行平均
+            with tf.name_scope("average"):
+                self.embeddings_output = tf.reduce_mean(self.embedded_words, axis=1)
+
+
+    def full_connection_layer(self):
+        """
+        全连接层，后面接dropout以及relu激活
+        :return:
+        """
+
+        # dropout
         with tf.name_scope("dropout"):
-            dropout_output = tf.nn.dropout(embedding_inputs, self.dropout_keep_prob)
+            h_drop = tf.nn.dropout(self.embeddings_output, self.keep_prob)
 
-        # 对词向量进行平均
-        with tf.name_scope("average"):
-            # self.inputs_embeddings = tf.reduce_mean(dropout_output, axis=1)
-            self.embeddings_output = tf.reduce_mean(embedding_inputs, axis=1)
-        # 输出层
-        logits = tf.matmul(self.embeddings_output, self.w) + self.b
-        # softmax output
-        # logits = tf.nn.softmax(tf.matmul(self.embeddings_output, self.w) + self.b, name='logits')
-        return logits
 
-    def nce_loss(self, l2_lambda=0.001):
-        """计算NCE交叉熵损失"""
-        if self.is_training:
-            labels = tf.reshape(self.label, [-1])
-            labels = tf.expand_dims(labels, 1)
-            loss = tf.reduce_mean(
-                tf.nn.nce_loss(weights=tf.transpose(self.w),
-                               biases=self.b,
-                               labels=labels,
-                               inputs=self.embeddings_output,
-                               num_sampled=self.num_sampled,
-                               num_classes=self.label_size,
-                               partition_strategy="div")
-            )
-        else:
-            labels_one_hot = tf.one_hot(self.label, self.label_size)
-            losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits)
-            print("loss0:", losses)
-            loss = tf.reduce_sum(losses, axis=1)
-            print("loss1:", loss)
+        # 全连接层的输出
+        with tf.name_scope("fully_connection_layer"):
+            output_w = tf.get_variable(
+                "output_w",
+                shape=[self.config.embedding_dim, self.config.num_labels],
+                initializer=tf.contrib.layers.xavier_initializer())
+            output_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_labels]), name="output_b")
+            self.logits = tf.nn.xw_plus_b(h_drop, output_w, output_b, name="logits")
+            # self.logits = tf.matmul(h_drop, output_w) + output_b
+            self.l2_loss += tf.nn.l2_loss(output_w)
+            self.l2_loss += tf.nn.l2_loss(output_b)
 
-        l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss = loss + l2_losses
-        return loss
 
-    def l2_loss(self, l2_lambda=0.0001):
-        """
-        根据每次训练的预测结果和标准结果比较，计算误差
-                loss = loss + l2_lambda*1/2*||variables||2
-        :param l2_lambda: 超参数，l2正则，保证l2_loss和train_loss在同一量级
-        :return: 每次训练的损失值loss
-        """
-        self.y_true = tf.one_hot(self.label, self.label_size)
-        # self.y_true = labels_one_hot.eval()
-        losses = tf.nn.softmax_cross_entropy_with_logits(
-            labels=self.y_true, logits=self.logits)
-        # losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_one_hot, logits=self.logits)
-        # losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.label, logits=self.logits)
-        loss = tf.reduce_mean(losses)
-        l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss = loss + l2_losses
-        return loss
+    def cal_loss(self):
 
-    def acc(self):
-        with tf.name_scope('accuracy'):
-            self.predictions = tf.argmax(self.logits, axis=1, name="predictions")
-            self.y_pred = tf.one_hot(self.predictions, self.label_size)
-            correct_predictions = tf.equal(tf.cast(self.predictions, tf.int32), self.label)
-            accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32), name="accuracy")
-        return accuracy
+        with tf.name_scope("loss"):
+            # 计算交叉熵损失
+            self.labels = tf.cast(self.labels, dtype=tf.int32)
+            losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.labels, logits=self.logits)
+            loss = tf.reduce_mean(losses)
 
-    def train(self):
-        learining_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.learning_decay_steps,
-                                                    self.learning_decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step,
-                                                   learning_rate=learining_rate, optimizer="Adam")
-        return train_op
+            # self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.config.l2_reg_lambda
+            # self.loss = loss + self.l2_loss
+            self.loss = loss + self.config.l2_reg_lambda * self.l2_loss
+

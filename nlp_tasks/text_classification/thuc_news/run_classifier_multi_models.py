@@ -20,7 +20,12 @@ from model_tensorflow.basic_train import TrainerBase
 from model_tensorflow.basic_predict import PredictorBase
 from nlp_tasks.text_classification.thuc_news.dataset_loader_for_multi_models import DatasetLoader
 from model_tensorflow.textcnn_model import TextCNN
-from model_tensorflow.textrcnn_model import RCNNModel
+from model_tensorflow.textrcnn_model import RCNN
+from model_tensorflow.char_cnn_model import CharCNN
+from model_tensorflow.bilstm_model import BiLstm
+from model_tensorflow.bilstm_attention_model import BiLstmAttention
+from model_tensorflow.transformer_model import Transformer
+from model_tensorflow.fasttext_model import Fasttext
 from evaluate.metrics import get_binary_metrics, get_multi_metrics, mean, get_custom_multi_metrics
 
 import logging
@@ -80,16 +85,21 @@ class Trainer(TrainerBase):
         根据config文件选择对应的模型，并初始化
         :return:
         """
-        if self.config.model_name == "textcnn":
+        if self.config.model_name == "fasttext":
+            self.model = Fasttext(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "textcnn":
             self.model = TextCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
-        # elif self.config["model_name"] == "bilstm":
-        #     self.model = BiLstmModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
-        # elif self.config["model_name"] == "bilstm_atten":
-        #     self.model = BiLstmAttenModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
+        elif self.config.model_name == "char_cnn":
+            self.model = CharCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "bilstm":
+            self.model = BiLstm(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "bilstm_attention":
+            self.model = BiLstmAttention(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "textrcnn":
-            self.model = RCNNModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
-        # elif self.config["model_name"] == "transformer":
-        #     self.model = TransformerModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
+            self.model = RCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "transformer":
+            self.model = Transformer(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+
 
     def train(self):
         """
@@ -270,16 +280,20 @@ class Predictor(PredictorBase):
         根据config文件选择对应的模型，并初始化
         :return:
         """
-        if self.config.model_name == "textcnn":
+        if self.config.model_name == "fasttext":
+            self.model = Fasttext(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "textcnn":
             self.model = TextCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
-        # elif self.config["model_name"] == "bilstm":
-        #     self.model = BiLstmModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
-        # elif self.config["model_name"] == "bilstm_atten":
-        #     self.model = BiLstmAttenModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
+        elif self.config.model_name == "char_cnn":
+            self.model = CharCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "bilstm":
+            self.model = BiLstm(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "bilstm_attention":
+            self.model = BiLstmAttention(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "textrcnn":
-            self.model = RCNNModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
-        # elif self.config["model_name"] == "transformer":
-        #     self.model = TransformerModel(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_vectors)
+            self.model = RCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "transformer":
+            self.model = Transformer(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
 
     def predict(self, sentence):
         """
@@ -353,6 +367,9 @@ def predict_to_file(config):
 
                 num_batches = len(lines) // batch_size
                 for i in range(num_batches + 1):
+                    if i % 100 == 0:
+                        log.info("已处理{}条".format(i * batch_size))
+
                     start = i * batch_size
                     end = start + batch_size
                     text_batch = list()
@@ -377,9 +394,9 @@ def predict_to_file(config):
                         out["predict_label"] = predict_labels[j]
                         if out:
                             wf.write(json.dumps(out, ensure_ascii=False) + "\n")
+                            wf.flush()
 
-                    if i % 100 == 0:
-                        log.info("已处理{}条".format(i * batch_size))
+
 
                 # 预测单条
                 # for i, _line in enumerate(lines):
@@ -445,10 +462,10 @@ def predict_report(file, log):
 
 def main():
     """
-    model_name = <"textcnn", "textrcnn", "char_cnn">
+    model_name = <"textcnn", "textrcnn", "char_cnn", "bilstm", "bilstm_attention", "transformer", "fasttext">
     :return:
     """
-    config = get_model_config(model_name="textrcnn")
+    config = get_model_config(model_name="fasttext")
     # train_model(config)
     predict_to_file(config)
 

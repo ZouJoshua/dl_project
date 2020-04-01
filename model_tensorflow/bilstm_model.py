@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 19-6-3 下午5:05
-@File    : textrnn_model.py
+@Time    : 4/1/20 3:22 PM
+@File    : bilstm_model.py
 @Desc    : 
+
 """
+
 
 import tensorflow as tf
 
@@ -14,7 +16,7 @@ import configparser
 
 
 class Config(object):
-    """RCNN配置参数"""
+    """BiLstm配置参数"""
     def __init__(self, config_file, section=None):
         config_ = configparser.ConfigParser()
         config_.read(config_file)
@@ -39,8 +41,7 @@ class Config(object):
         self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
         self.vocab_size = config.getint("vocab_size")                      # 字典大小
         self.hidden_sizes = eval(config.get("hidden_sizes", "[256,256]"))  # lstm的隐层大小，列表对象，支持多层lstm，只要在列表中添加相应的层对应的隐层大小
-        self.output_size = config.getint("output_size")                    # 从高维映射到低维的神经元个数
-
+        self.output_size = config.getint("output_size")                    # 从高维映射到低维的神经元个数(不设置)
         self.is_training = config.getboolean("is_training", False)
         self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
         self.optimization = config.get("optimization", "adam")             # 优化算法
@@ -54,15 +55,15 @@ class Config(object):
         self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
         self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
         self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
-        self.model_name = config.get("model_name", "textrcnn")              # 模型名称
+        self.model_name = config.get("model_name", "bilstm")              # 模型名称
 
 
 
 
-class RCNN(BaseModel):
+class BiLstm(BaseModel):
 
     def __init__(self, config, vocab_size, word_vectors):
-        super(RCNN, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
+        super(BiLstm, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
 
         # 构建模型
         self.build_model()
@@ -72,7 +73,6 @@ class RCNN(BaseModel):
     def build_model(self):
         self.embedding_layer()
         self.bi_lstm_layer()
-        self.max_pooling_layer()
         self.full_connection_layer()
         self.cal_loss()
 
@@ -127,72 +127,14 @@ class RCNN(BaseModel):
                     # 对outputs中的fw和bw的结果拼接 [batch_size, time_step, hidden_size * 2], 传入到下一层Bi-LSTM中
                     self.embedded_words = tf.concat(outputs, 2)
 
-            # 将最后一层Bi-LSTM输出的结果分割成前向和后向的输出
-            self.fw_output, self.bw_output = tf.split(self.embedded_words, 2, -1)
-
-    def multi_bi_lstm_layer(self):
-        """
-        实现多层的LSTM结构
-        :return:
-        """
-        fw_hidden_layers = []
-        bw_hidden_layers = []
-
-        with tf.name_scope("bi-lstm-layer"):
-            for idx, hidden_size in enumerate(self.config.hidden_sizes):
-                with tf.name_scope("bi-lstm" + str(idx)):
-                    # 定义前向LSTM结构
-                    lstm_fw_cell = tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.LSTMCell(num_units=hidden_size, state_is_tuple=True),
-                        output_keep_prob=self.keep_prob)
-                    # 定义反向LSTM结构
-                    lstm_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
-                        tf.nn.rnn_cell.LSTMCell(num_units=hidden_size, state_is_tuple=True),
-                        output_keep_prob=self.keep_prob)
-
-                    fw_hidden_layers.append(lstm_fw_cell)
-                    bw_hidden_layers.append(lstm_bw_cell)
-
-            # 实现多层的LSTM结构， state_is_tuple=True，则状态会以元祖的形式组合(h, c)，否则列向拼接
-            fw_multi_lstm = tf.nn.rnn_cell.MultiRNNCell(cells=fw_hidden_layers, state_is_tuple=True)
-            bw_multi_lstm = tf.nn.rnn_cell.MultiRNNCell(cells=bw_hidden_layers, state_is_tuple=True)
-
-            # 采用动态rnn，可以动态的输入序列的长度，若没有输入，则取序列的全长
-            # outputs是一个元祖(output_fw, output_bw)，其中两个元素的维度都是[batch_size, max_time, hidden_size],fw和bw的hidden_size一样
-            # self.current_state 是最终的状态，二元组(state_fw, state_bw)，state_fw=[batch_size, s]，s是一个元祖(h, c)
-            outputs, self.current_state = tf.nn.bidirectional_dynamic_rnn(fw_multi_lstm, bw_multi_lstm, self.embedded_words,
-                                                                          dtype=tf.float32)
-            self.fw_output, self.bw_output = outputs
-
-
-    def max_pooling_layer(self):
-        """
-        将Bi-LSTM获得的隐层输出和词向量拼接[fw_output, word_embedding, bw_output]
-        将拼接后的向量非线性映射到低维
-        向量中的每一个位置的值都取所有时序上的最大值，得到最终的特征向量，该过程类似于max-pool
-        :return:
-        """
-        with tf.name_scope("context"):
-            shape = [tf.shape(self.fw_output)[0], 1, tf.shape(self.fw_output)[2]]
-            context_left = tf.concat([tf.zeros(shape), self.fw_output[:, :-1]], axis=1, name="context_left")
-            context_right = tf.concat([self.bw_output[:, 1:], tf.zeros(shape)], axis=1, name="context_right")
-
-
-        # 将前向，后向的输出和最早的词向量拼接在一起得到最终的词表征
-        # 将Bi-LSTM获得的隐层输出和词向量拼接[fw_output, word_embedding, bw_output]
-        with tf.name_scope("word_representation"):
-            word_representation = tf.concat([context_left, self._embedded_words, context_right], axis=2)
-            word_size = self.config.hidden_sizes[-1] * 2 + self.config.embedding_dim
-
-        with tf.name_scope("text_representation"):
-            text_w = tf.Variable(tf.random_uniform([word_size, self.config.output_size], -1.0, 1.0), name="text_w")
-            text_b = tf.Variable(tf.constant(0.1, shape=[self.config.output_size]), name="text_b")
-
-            # tf.einsum可以指定维度的消除运算
-            text_representation = tf.tanh(tf.einsum('aij,jk->aik', word_representation, text_w) + text_b)
-
-        # 做max-pool的操作，将时间步的维度消失
-        self.pool_output = tf.reduce_max(text_representation, axis=1)
+            # 取出最后时间步的输出作为全连接的输入
+            final_output = self.embedded_words[:, -1, :]
+            # 因为是双向LSTM，最终的输出值是fw和bw的拼接，因此要乘以2
+            self._output_size = self.config.hidden_sizes[-1] * 2
+            # reshape成全连接层的输入维度
+            self.pool_output = tf.reshape(final_output, [-1, self._output_size])
+            # # 将最后一层Bi-LSTM输出的结果分割成前向和后向的输出
+            # self.fw_output, self.bw_output = tf.split(self.embedded_words, 2, -1)
 
 
     def full_connection_layer(self):
@@ -210,7 +152,7 @@ class RCNN(BaseModel):
         with tf.name_scope("fully_connection_layer"):
             output_w = tf.get_variable(
                 "output_w",
-                shape=[self.config.output_size, self.config.num_labels],
+                shape=[self._output_size, self.config.num_labels],
                 initializer=tf.contrib.layers.xavier_initializer())
             output_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_labels]), name="output_b")
             self.logits = tf.nn.xw_plus_b(h_drop, output_w, output_b, name="logits")
