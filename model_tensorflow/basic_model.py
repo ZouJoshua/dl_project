@@ -25,7 +25,7 @@ class BaseModel(object):
         self.vocab_size = vocab_size
         self.word_vectors = word_vectors
         self.inputs = tf.placeholder(tf.int32, [None, None], name="inputs")            # 数据输入
-        self.labels = tf.placeholder(tf.int32, [None], name="labels")                # 标签
+        self.labels = tf.placeholder(tf.int32, [None], name="labels")                  # 标签
         self.keep_prob = tf.placeholder(tf.float32, name="keep_prob")                  # dropout
 
         self.l2_loss = tf.constant(0.0)                     # 定义l2损失

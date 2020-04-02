@@ -20,6 +20,7 @@ from model_tensorflow.basic_train import TrainerBase
 from model_tensorflow.basic_predict import PredictorBase
 from nlp_tasks.text_classification.thuc_news.dataset_loader_for_multi_models import DatasetLoader
 from model_tensorflow.textcnn_model import TextCNN
+from model_tensorflow.textrnn_model import TextRNN
 from model_tensorflow.textrcnn_model import RCNN
 from model_tensorflow.char_cnn_model import CharCNN
 from model_tensorflow.bilstm_model import BiLstm
@@ -91,12 +92,14 @@ class Trainer(TrainerBase):
             self.model = TextCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "char_cnn":
             self.model = CharCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "textrnn":
+            self.model = TextRNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "textrcnn":
+            self.model = RCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "bilstm":
             self.model = BiLstm(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "bilstm_attention":
             self.model = BiLstmAttention(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
-        elif self.config.model_name == "textrcnn":
-            self.model = RCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "transformer":
             self.model = Transformer(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
 
@@ -286,12 +289,14 @@ class Predictor(PredictorBase):
             self.model = TextCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "char_cnn":
             self.model = CharCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "textrnn":
+            self.model = TextRNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
+        elif self.config.model_name == "textrcnn":
+            self.model = RCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "bilstm":
             self.model = BiLstm(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "bilstm_attention":
             self.model = BiLstmAttention(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
-        elif self.config.model_name == "textrcnn":
-            self.model = RCNN(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
         elif self.config.model_name == "transformer":
             self.model = Transformer(config=self.config, vocab_size=self.vocab_size, word_vectors=self.word_embedding)
 
@@ -462,12 +467,12 @@ def predict_report(file, log):
 
 def main():
     """
-    model_name = <"textcnn", "textrcnn", "char_cnn", "bilstm", "bilstm_attention", "transformer", "fasttext">
+    model_name = <"textcnn", "textrcnn", "char_cnn", "textrnn", "bilstm", "bilstm_attention", "transformer", "fasttext">
     :return:
     """
-    config = get_model_config(model_name="fasttext")
-    # train_model(config)
-    predict_to_file(config)
+    config = get_model_config(model_name="textrnn")
+    train_model(config)
+    # predict_to_file(config)
 
 
 if __name__ == "__main__":
