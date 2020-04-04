@@ -8,24 +8,26 @@
 
 """
 
-
 from torch.utils.data import Dataset
 import tqdm
-import json
 import torch
 import random
-import numpy as np
 from sklearn.utils import shuffle
 import re
 
 
+
+
+
 class BertTorchDataset(Dataset):
 
-    def __init__(self, corpus_path, word2idx_path, label2idx_path, max_seq_len, data_regularization=False):
+    def __init__(self, corpus_path, word2idx, label2idx, max_seq_len, data_regularization=False):
 
         self.data_regularization = data_regularization
         # self.word2idx_path = word2idx_path
         # define max length
+        self.word2idx = word2idx
+        self.label2idx = label2idx
         self.max_seq_len = max_seq_len
         # directory of corpus dataset
         self.corpus_path = corpus_path
@@ -36,13 +38,6 @@ class BertTorchDataset(Dataset):
         self.sep_index = 3
         self.mask_index = 4
         self.num_index = 5
-
-        # 加载字典
-        with open(word2idx_path, "r", encoding="utf-8") as f:
-            self.word2idx = json.load(f)
-
-        with open(label2idx_path, "r", encoding="utf-8") as f:
-            self.label2idx = json.load(f)
 
         # 加载语料
         with open(corpus_path, "r", encoding="utf-8") as f:
@@ -79,7 +74,7 @@ class BertTorchDataset(Dataset):
                             text = text[cut_position:]
 
 
-        text_input = self.tokenize_char(text)
+        text_input = self.trans_to_index(text)
         label_input = self.label2idx[label]
 
         # 添加#CLS#和#SEP#特殊token
@@ -97,5 +92,19 @@ class BertTorchDataset(Dataset):
         label = self.lines[item]["label"]
         return text, label
 
-    def tokenize_char(self, text):
-        return [self.word2idx.get(char, self.unk_index) for char in text]
+    def trans_to_index(self, text, ues_word=False):
+        """
+        将输入转化为索引表示
+        :param inputs: 输入
+        :param word_to_index: 词汇-索引映射表
+        :return:
+        """
+        if ues_word:
+            tokenizer = lambda x: x.split(' ')  # 以空格隔开，word-level
+        else:
+            tokenizer = lambda x: [y for y in x]  # char-level
+
+        inputs_idx = [self.word2idx.get(word, self.unk_index) for word in tokenizer(text)]
+
+        return inputs_idx
+

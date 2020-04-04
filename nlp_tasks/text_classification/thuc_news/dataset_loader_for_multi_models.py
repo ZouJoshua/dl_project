@@ -167,7 +167,8 @@ class DatasetLoader(DataBase):
         """
         self.log.info("*** Generate mapping tables for vocabulary, labels, etc.")
 
-        words = ["<PAD>", "<UNK>"] + words
+        spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]
+        words = spec_tokens + words
         vocab = words[:self.vocab_size]
 
         # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size

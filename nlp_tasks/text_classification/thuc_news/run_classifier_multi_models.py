@@ -75,7 +75,7 @@ class Trainer(TrainerBase):
         :return:
         """
         data_file = os.path.join(self.config.data_path, "thuc_news.{}.txt".format(mode))
-        pkl_file = os.path.join(self.config.data_path, "{}_data.pkl".format(mode))
+        pkl_file = os.path.join(self.config.data_path, "{}_data_{}.pkl".format(mode, self.config.sequence_length))
         if not os.path.exists(data_file):
             raise FileNotFoundError
         inputs, labels = self.data_obj.convert_examples_to_features(data_file, pkl_file, mode)

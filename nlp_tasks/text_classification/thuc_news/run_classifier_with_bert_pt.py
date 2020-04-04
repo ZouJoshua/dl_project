@@ -13,7 +13,9 @@ import configparser
 import os
 import json
 import tqdm
+import pickle
 import pandas as pd
+import numpy as np
 
 from torch.utils.data import DataLoader
 from sklearn import metrics
@@ -21,55 +23,114 @@ from sklearn import metrics
 from nlp_tasks.text_classification.thuc_news.dataset_loader_for_bert_pt import BertTorchDataset
 from nlp_tasks.text_classification.thuc_news.bert_pt_model import *
 from setting import CONFIG_PATH
+import logging
+
+
 
 conf_file = os.path.join(CONFIG_PATH, "bert_model_config.ini")
 
 
-class Trainer:
-    def __init__(self, max_seq_len,
-                 batch_size,
-                 lr,  # 学习率
-                 with_cuda=True,  # 是否使用GPU, 如未找到GPU, 则自动切换CPU
-                 ):
+class Config(object):
+    """bert_pytorch配置参数"""
+    def __init__(self, config_file, section=None):
         config_ = configparser.ConfigParser()
-        config_.read(conf_file)
-        self.config = config_["SENTIMENT"]
-        self.vocab_size = int(self.config["vocab_size"])
-        self.batch_size = batch_size
-        self.lr = lr
-        # 加载字典
-        with open(self.config["word2idx_path"], "r", encoding="utf-8") as f:
-            self.word2idx = json.load(f)
+        config_.read(config_file)
+        if not config_.has_section(section):
+            raise Exception("Section={} not found".format(section))
+
+        self.all_params = {}
+        for i in config_.items(section):
+            self.all_params[i[0]] = i[1]
+
+        config = config_[section]
+        if not config:
+            raise Exception("Config file error.")
+        self.data_path = config.get("data_path")                           # 数据目录
+        self.output_path = config.get("output_path")                       # 输出目录(模型文件\)
+        self.bert_init_checkpoint = config.get("init_checkpoint")
+        self.bert_config_path = config.get("bert_config_file")
+        self.vocab_file = config.get("vocab_file")
+        self.label2idx_path = config.get("label2idx_path")                 # label映射文件
+        self.pretrain_embedding = config.get("pretrain_embedding")         # 预训练词向量文件
+        self.stopwords_path = config.get("stopwords_path", "")             # 停用词文件
+        self.ckpt_model_path = config.get("ckpt_model_path", "")           # 模型目录
+        self.sequence_length = config.getint("sequence_length")            # 序列长度
+        self.num_labels = config.getint("num_labels")                      # 类别数,二分类时置为1,多分类时置为实际类别数
+        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
+        self.vocab_size = config.getint("vocab_size")                      # 字典大小
+        self.is_training = config.getboolean("is_training", False)
+        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
+        self.learning_rate = config.getfloat("learning_rate")              # 学习速率
+        self.l2_reg_lambda = config.getfloat("l2_reg_lambda", 0.0)              # L2正则化的系数，主要对全连接层的参数正则化
+        self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
+        self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
+        self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
+        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
+        self.warmup_proportion = config.getfloat("warmup_proportion")
+        self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
+        self.model_name = config.get("model_name", "bert_pytorch")              # 模型名称
+
+
+
+
+
+
+
+
+class Trainer:
+
+    def __init__(self, config, logger=None,
+                 with_cuda=True  # 是否使用GPU, 如未找到GPU, 则自动切换CPU
+                 ):
+
+        if logger:
+            self.log = logger
+        else:
+            self.log = logging.getLogger("bert_train_log")
+            logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
+            logging.root.setLevel(level=logging.INFO)
+
+        self.config = config
+
+        self.train_corpus_path = os.path.join(config.data_path, "thuc_news.train.txt")
+        self.test_corpus_path = os.path.join(config.data_path, "thuc_news.eval.txt")
+        self.lr = config.learning_rate
+        self.word2idx, self.label2idx, _vocab_size = self.load_index()
+        if config.vocab_size > _vocab_size:
+            self.vocab_size = config.vocab_size
+
+
+
         # 判断是否有可用GPU
         cuda_condition = torch.cuda.is_available() and with_cuda
         self.device = torch.device("cuda:0" if cuda_condition else "cpu")
         # 允许的最大序列长度
-        self.max_seq_len = max_seq_len
+        self.max_seq_len = config.sequence_length
         # 定义模型超参数
         bertconfig = BertConfig(vocab_size=self.vocab_size)
         # 初始化BERT情感分析模型
-        self.bert_model = BertSentimentAnalysis(config=bertconfig)
+        self.bert_model = ThucNewsBertModel(config=bertconfig)
         # 将模型发送到计算设备(GPU或CPU)
         self.bert_model.to(self.device)
         # 声明训练数据集, 按照pytorch的要求定义数据集class
-        train_dataset = CLSDataset(corpus_path=self.config["train_corpus_path"],
+        train_dataset = BertTorchDataset(corpus_path=self.train_corpus_path,
                                    word2idx=self.word2idx,
                                    max_seq_len=self.max_seq_len,
-                                   data_regularization=True
+                                   data_regularization=False
                                    )
         self.train_dataloader = DataLoader(train_dataset,
-                                           batch_size=self.batch_size,
+                                           batch_size=self.config.train_batch_size,
                                            num_workers=0,
                                            collate_fn=lambda x: x  # 这里为了动态padding
                                            )
         # 声明测试数据集
-        test_dataset = CLSDataset(corpus_path=self.config["test_corpus_path"],
+        test_dataset = BertTorchDataset(corpus_path=self.test_corpus_path,
                                   word2idx=self.word2idx,
                                   max_seq_len=self.max_seq_len,
                                   data_regularization=False
                                   )
         self.test_dataloader = DataLoader(test_dataset,
-                                          batch_size=self.batch_size,
+                                          batch_size=self.config.eval_batch_size,
                                           num_workers=0,
                                           collate_fn=lambda x: x)
         # 初始化位置编码
@@ -88,8 +149,10 @@ class Trainer:
         # self.optim_parameters = list(self.bert_model.parameters())
 
         self.init_optimizer(lr=self.lr)
-        if not os.path.exists(self.config["state_dict_dir"]):
-            os.mkdir(self.config["state_dict_dir"])
+        if not os.path.exists(self.config.ckpt_model_path):
+
+            if not os.path.exists(self.config.ckpt_model_path):
+                os.mkdir(self.config.ckpt_model_path)
 
     def init_optimizer(self, lr):
         # 用指定的学习率初始化优化器
@@ -108,11 +171,35 @@ class Trainer:
         position_enc = torch.from_numpy(position_enc).type(torch.FloatTensor)
         return position_enc
 
+    def load_index(self):
+        # 加载字典
+        if os.path.exists(self.config.word2idx_path):
+            # 将词汇-索引映射表加载出来
+            self.log.info("Load word2index from file: {}".format(self.config.word2idx_path))
+            with open(self.config.word2idx_path, "rb") as f:
+                word2idx = pickle.load(f)
+        else:
+            self.log.error("Word2index file {} not found".format(self.config.word2idx_path))
+            raise FileNotFoundError
+
+        if os.path.exists(self.config.label2idx_path):
+            # 将标签-索引映射表加载出来
+            self.log.info("Load label2index from file: {}".format(self.config.label2idx_path))
+            with open(self.config.label2idx_path, "rb") as f:
+                label2idx = pickle.load(f)
+        else:
+            self.log.error("Label2index file {} not found".format(self.config.label2idx_path))
+            raise FileNotFoundError
+
+        vocab_size = len(word2idx)
+
+        return word2idx, label2idx, vocab_size
+
 
     def load_model(self, model, dir_path="../output", load_bert=False):
         checkpoint_dir = self.find_most_recent_state_dict(dir_path)
         checkpoint = torch.load(checkpoint_dir)
-        # 情感分析模型刚开始训练的时候, 需要载入预训练的BERT,
+        # 模型刚开始训练的时候, 需要载入预训练的BERT,
         # 这是我们不载入模型原本用于训练Next Sentence的pooler
         # 而是重新初始化了一个
         if load_bert:
@@ -217,8 +304,8 @@ class Trainer:
             if i % 10 == 0:
                 data_iter.write(str({k: v for k, v in log_dic.items() if v != 0}))
 
-        threshold_ = find_best_threshold(all_predictions, all_labels)
-        print(str_code + " best threshold: " + str(threshold_))
+        # threshold_ = find_best_threshold(all_predictions, all_labels)
+        # print(str_code + " best threshold: " + str(threshold_))
 
         # 将当前epoch的情况记录到DataFrame里
         if train:
@@ -261,7 +348,7 @@ class Trainer:
 
 if __name__ == '__main__':
     def init_trainer(dynamic_lr, batch_size=24):
-        trainer = SentimentTrainer(max_seq_len=300,
+        trainer = Trainer(max_seq_len=300,
                                     batch_size=batch_size,
                                     lr=dynamic_lr,
                                     with_cuda=True,)
