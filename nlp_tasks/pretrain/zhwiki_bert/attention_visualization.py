@@ -28,7 +28,7 @@ from setting import DATA_PATH, CONFIG_PATH
 
 
 font_path = os.path.join(DATA_PATH, "common", "font", "SimHei.ttf")
-config_path = os.path.join(CONFIG_PATH, "bert_model_config.ini")
+config_path = os.path.join(CONFIG_PATH, "bert_pytorch.ini")
 font = FontProperties(fname=font_path)
 
 

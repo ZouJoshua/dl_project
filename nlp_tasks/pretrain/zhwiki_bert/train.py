@@ -15,7 +15,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 
-from model_pytorch.bert_model import *
+from model_pytorch.bert_base_model import *
 from nlp_tasks.pretrain.zhwiki_bert.dataset import BERTDataset
 from setting import DATA_PATH
 import os
