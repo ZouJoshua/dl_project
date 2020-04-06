@@ -57,7 +57,7 @@ class Config(object):
         self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
         self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
         self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
-        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
+        # self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
         self.warmup_proportion = config.getfloat("warmup_proportion")
         self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
         self.model_name = config.get("model_name", "bert_pytorch")              # 模型名称
@@ -95,6 +95,7 @@ class Trainer:
         self.max_seq_len = config.sequence_length
         # 定义模型超参数
         bertconfig = BertConfig(vocab_size=self.vocab_size)
+        bertconfig.num_labels = config.num_labels
         # 初始化BERT文本分类模型
         self.bert_model = ThucNewsBertModel(config=bertconfig)
         # 将模型发送到计算设备(GPU或CPU)
@@ -227,8 +228,8 @@ class Trainer:
         df_path = os.path.join(self.config.output_path, df_name)
         # df_path = self.config["state_dict_dir"] + "/" + df_name
         if not os.path.isfile(df_path):
-            df = pd.DataFrame(columns=["epoch", "train_loss", "train_auc",
-                                       "test_loss", "test_auc"
+            df = pd.DataFrame(columns=["epoch", "train_loss", "train_acc",
+                                       "test_loss", "test_acc"
                                        ])
             df.to_pickle(df_path)
             self.log.info("log DataFrame created!")
@@ -241,7 +242,7 @@ class Trainer:
                               bar_format="{l_bar}{r_bar}")
 
         total_loss = 0
-        # 存储所有预测的结果和标记, 用来计算auc
+        # 存储所有预测的结果和标记, 用来计算acc
         all_predictions, all_labels = [], []
 
         for i, data in data_iter:
@@ -259,15 +260,21 @@ class Trainer:
                                                         labels=data["label"]
                                                         )
             # 提取预测的结果和标记, 并存到all_predictions, all_labels里
-            # 用来计算auc
-            predictions = predictions.detach().cpu().numpy().reshape(-1).tolist()
-            labels = data["label"].cpu().numpy().reshape(-1).tolist()
-            all_predictions.extend(predictions)
-            all_labels.extend(labels)
-            # 计算auc
-            fpr, tpr, thresholds = metrics.roc_curve(y_true=all_labels,
-                                                     y_score=all_predictions)
-            auc = metrics.auc(fpr, tpr)
+            # 用来计算acc
+            true_labels = data["label"].data.cpu()
+            predic_labels = torch.max(predictions.data, 1)[1].cpu()
+            # predictions = predictions.detach().cpu().numpy().reshape(-1).tolist()
+            # labels = data["label"].cpu().numpy().reshape(-1).tolist()
+
+            all_predictions.extend(predic_labels)
+            all_labels.extend(true_labels)
+
+            _acc = metrics.accuracy_score(true_labels, predic_labels)
+
+            # # 计算auc
+            # fpr, tpr, thresholds = metrics.roc_curve(y_true=all_labels,
+            #                                          y_score=all_predictions)
+            # auc = metrics.auc(fpr, tpr)
 
             # 反向传播
             if train:
@@ -284,15 +291,15 @@ class Trainer:
             if train:
                 log_dic = {
                     "epoch": epoch,
-                    "train_loss": total_loss/(i+1), "train_auc": auc,
-                    "test_loss": 0, "test_auc": 0
+                    "train_loss": total_loss/(i+1), "train_acc": _acc,
+                    "test_loss": 0, "test_acc": 0
                 }
 
             else:
                 log_dic = {
                     "epoch": epoch,
-                    "train_loss": 0, "train_auc": 0,
-                    "test_loss": total_loss/(i+1), "test_auc": auc
+                    "train_loss": 0, "train_acc": 0,
+                    "test_loss": total_loss/(i+1), "test_acc": _acc
                 }
 
             if i % 10 == 0:
@@ -314,8 +321,8 @@ class Trainer:
             for k, v in log_dic.items():
                 df.at[epoch, k] = v
             df.to_pickle(df_path)
-            # 返回auc, 作为early stop的衡量标准
-            return auc
+            # 返回_acc, 作为early stop的衡量标准
+            return _acc
 
     def find_most_recent_state_dict(self, dir_path):
         """
@@ -352,12 +359,12 @@ def train_model():
     log = Logger("train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
     log.info(json.dumps(config.all_params, indent=4))
-    trainer = Trainer(config, logger=log)
+    trainer = Trainer(config, logger=log, with_cuda=False)
     dynamic_lr = config.learning_rate
     start_epoch = 0
     train_epoches = 9999
 
-    all_auc = []
+    all_acc = []
     threshold = 999
     patient = 10
     best_loss = 999999999
@@ -368,7 +375,7 @@ def train_model():
             trainer.load_model(trainer.bert_model, dir_path=trainer.config.init_checkpoint, load_bert=True)
         elif epoch == start_epoch:
             trainer.load_model(trainer.bert_model, dir_path=trainer.ckpt_model_path)
-        log.info("*** train with learning rate {} ****".format(str(dynamic_lr)))
+        log.info("*** Train with learning rate {} ****".format(str(dynamic_lr)))
         # 训练一个epoch
         trainer.train(epoch)
         # 保存当前epoch模型参数
@@ -379,9 +386,9 @@ def train_model():
 
         auc = trainer.test(epoch)
 
-        all_auc.append(auc)
-        best_auc = max(all_auc)
-        if all_auc[-1] < best_auc:
+        all_acc.append(auc)
+        best_auc = max(all_acc)
+        if all_acc[-1] < best_auc:
             threshold += 1
             dynamic_lr *= 0.8
             trainer.init_optimizer(lr=dynamic_lr)

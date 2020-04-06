@@ -19,22 +19,25 @@ class ThucNewsBertModel(nn.Module):
     def __init__(self, config):
         super(ThucNewsBertModel, self).__init__()
         self.bert = BertModel(config)
-        self.final_dense = nn.Linear(config.hidden_size, 1)
+        self.final_dense = nn.Linear(config.hidden_size, config.num_labels)
         self.activation = nn.Softmax()
 
     def compute_loss(self, predictions, labels):
         # 将预测和标记的维度展平, 防止出现维度不一致
-        # 逻辑回归
-        predictions = predictions.view(-1)
-        labels = labels.float().view(-1)
-        epsilon = 1e-8
-        # 交叉熵
-        loss =\
-            - labels * torch.log(predictions + epsilon) - \
-            (torch.tensor(1.0) - labels) * torch.log(torch.tensor(1.0) - predictions + epsilon)
-        # 求均值, 并返回可以反传的loss
-        # loss为一个实数
-        loss = torch.mean(loss)
+        # # 逻辑回归
+        # predictions = predictions.view(-1)
+        # labels = labels.float().view(-1)
+        # epsilon = 1e-8
+        # # 交叉熵
+        # loss =\
+        #     - labels * torch.log(predictions + epsilon) - \
+        #     (torch.tensor(1.0) - labels) * torch.log(torch.tensor(1.0) - predictions + epsilon)
+        # # 求均值, 并返回可以反传的loss
+        # # loss为一个实数
+        # loss = torch.mean(loss)
+
+        loss = nn.functional.cross_entropy(predictions, labels)
+
         return loss
 
     def forward(self, text_input, positional_enc, labels=None):
@@ -56,7 +59,7 @@ class ThucNewsBertModel(nn.Module):
         # predictions = self.dense(first_token_tensor)
         predictions = self.final_dense(first_token_tensor)
 
-        # 用sigmoid函数做激活, 返回0-1之间的值
+        # 用softmax函数做激活, 返回0-1之间的值
         predictions = self.activation(predictions)
         if labels is not None:
             # 计算loss
