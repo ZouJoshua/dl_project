@@ -14,47 +14,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import copy
-import configparser
+from model_pytorch.basic_config import ConfigBase
 
-class Config(object):
 
+class Config(ConfigBase):
     """transformer_pytorch配置参数"""
-    def __init__(self, config_file, section=None):
-        config_ = configparser.ConfigParser()
-        config_.read(config_file)
-        if not config_.has_section(section):
-            raise Exception("Section={} not found".format(section))
-
-        self.all_params = {}
-        for i in config_.items(section):
-            self.all_params[i[0]] = i[1]
-
-        config = config_[section]
-        if not config:
-            raise Exception("Config file error.")
-        self.model_name = config.get("model_name", "transformer_pytorch")       # 模型名称
-        self.data_path = config.get("data_path")                             # 数据目录
-        self.output_path = config.get("output_path")                         # 输出目录(模型文件\)
-        self.label2idx_path = config.get("label2idx_path")                   # label映射文件
-        self.pretrain_embedding = config.get("pretrain_embedding")           # 预训练词向量文件
-        self.stopwords_path = config.get("stopwords_path", "")               # 停用词文件
-        self.ckpt_model_path = config.get("ckpt_model_path", "")             # 模型目录
-        self.sequence_length = config.getint("sequence_length")              # 序列长度,每句话处理成的长度(短填长切)
-        self.num_labels = config.getint("num_labels")                        # 类别数,二分类时置为1,多分类时置为实际类别数
-        self.embedding_dim = config.getint("embedding_dim")                  # 字\词向量维度
-        self.vocab_size = config.getint("vocab_size")                        # 字典大小,词表大小,在运行时赋值
-        self.dim_model = config.getint("dim_model", 300)
-        self.hidden_size = config.getint("hidden_size", 1024)                # 隐藏层大小
-        self.last_hidden_size = config.getint("hidden_size", 512)
-        self.num_head = config.getint("num_head", 5)                         # head个数
-        self.num_encoder = config.getint("num_encoder", 2)                   # encoder块个数
-        self.dropout_keep_prob = config.getfloat("dropout_keep_prob", 0.8)   # 保留神经元的比例,随机失活
-        self.learning_rate = config.getfloat("learning_rate")                # 学习速率
-        self.num_epochs = config.getint("num_epochs")                        # 全样本迭代次数
-        self.batch_size = config.getint("batch_size")                        # 批样本大小,mini-batch大小
-        self.eval_every_step = config.getint("eval_every_step")              # 迭代多少步验证一次模型
-        self.require_improvement = config.getint("require_improvement")      # 若超过1000batch效果还没提升，则提前结束训练
+    def __init__(self, config_file, section):
+        super(Config, self).__init__(config_file, section=section)
+        self.num_layers = self.config.getint("num_layers")  # lstm层数
+        self.dim_model = self.config.getint("dim_model", 300)
+        self.hidden_size = self.config.getint("hidden_size", 1024)  # 隐藏层大小
+        self.last_hidden_size = self.config.getint("last_hidden_size", 512)
+        self.num_head = self.config.getint("num_head", 5)  # head个数
+        self.num_encoder = self.config.getint("num_encoder", 2)  # encoder块个数
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
+
 
 
 class AttentionModel(nn.Module):
@@ -63,12 +37,12 @@ class AttentionModel(nn.Module):
     """
     def __init__(self, config):
         super(AttentionModel, self).__init__()
-        if config.pretrain_embedding is not None:
-            self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding, freeze=False)
+        if config.pretrain_embedding_file is not None:
+            self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
         else:
             self.embedding = nn.Embedding(config.vocab_size, config.embedding_dim, padding_idx=config.vocab_size - 1)
 
-        self.postion_embedding = Positional_Encoding(config.embedding_dim, config.sequence_length, config.dropout, config.device)
+        self.postion_embedding = Positional_Encoding(config.embedding_dim, config.sequence_length, config.dropout_keep_prob, config.device)
         self.encoder = Encoder(config.dim_model, config.num_head, config.hidden_size, config.dropout_keep_prob)
         self.encoders = nn.ModuleList([
             copy.deepcopy(self.encoder)

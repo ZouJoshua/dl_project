@@ -384,9 +384,9 @@ def train_model():
                                 state_dict_dir=trainer.ckpt_model_path,
                                 file_path="{}.model".format(trainer.config.model_name))
 
-        auc = trainer.test(epoch)
+        acc = trainer.test(epoch)
 
-        all_acc.append(auc)
+        all_acc.append(acc)
         best_auc = max(all_acc)
         if all_acc[-1] < best_auc:
             threshold += 1
@@ -397,7 +397,7 @@ def train_model():
             threshold = 0
 
         if threshold >= patient:
-            log.info("epoch {} has the lowest loss".format(start_epoch + np.argmax(np.array(all_auc))))
+            log.info("epoch {} has the lowest loss".format(start_epoch + np.argmax(np.array(all_acc))))
             log.info("early stop!")
             break
 
