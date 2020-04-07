@@ -65,6 +65,15 @@ test=
 验证集	1万
 测试集	1万
 
+模型	acc	备注
+bert	94.83%	单纯的bert
+ERNIE	94.61%	说好的中文碾压bert呢
+bert_CNN	94.44%	bert + CNN
+bert_RNN	94.57%	bert + RNN
+bert_RCNN	94.51%	bert + RCNN
+bert_DPCNN	94.47%	bert + DPCNN
+原始的bert效果就很好了，把bert当作embedding层送入其它模型，效果反而降了，之后会尝试长文本的效果对比。
+
 
 
 ## baseline
