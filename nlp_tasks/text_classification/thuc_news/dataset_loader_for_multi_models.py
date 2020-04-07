@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 3/23/20 12:18 AM
-@File    : dataset_loader_for_textcnn.py
+@File    : dataset_loader_for_multi_models.py
 @Desc    : 
 
 """
