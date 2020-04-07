@@ -33,7 +33,6 @@ class Config(object):
         self.data_path = config.get("data_path")                             # 数据目录
         self.output_path = config.get("output_path")                         # 输出目录(模型文件\)
         self.label2idx_path = config.get("label2idx_path")                   # label映射文件
-        self.pretrain_embedding = config.get("pretrain_embedding")           # 预训练词向量文件
         self.pretrain_bert_path = config.get("pretrain_bert_path", './ERNIE_pretrain')  # 预训练bert路径
         self.tokenizer = BertTokenizer.from_pretrained(self.pretrain_bert_path)
         self.stopwords_path = config.get("stopwords_path", "")               # 停用词文件
