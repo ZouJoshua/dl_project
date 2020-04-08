@@ -19,7 +19,8 @@ class Config(ConfigBase):
     """textcnn_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
+        self.device = torch.device('cpu')  # 设备
         self.filter_sizes = eval(self.config.get("filter_sizes", (2, 3, 4)))       # 卷积核尺寸
         self.num_filters = self.config.getint("num_filters")                      # 卷积核数量(channels数)
 
