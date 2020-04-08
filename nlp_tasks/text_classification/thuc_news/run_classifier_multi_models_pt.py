@@ -18,16 +18,56 @@ import torch
 import numpy as np
 import os
 from importlib import import_module
-from nlp_tasks.text_classification.thuc_news.dataset_loader_for_multi_models_pt import get_time_dif
+from nlp_tasks.text_classification.thuc_news.dataset_loader_for_multi_models_pt import get_time_dif, DatasetLoader
 from tensorboardX import SummaryWriter
 from utils.logger import Logger
 from setting import CONFIG_PATH
 import json
-
+import logging
 
 class Trainer(object):
-    def __init__(self, config, ):
+    def __init__(self, config, logger=None):
+        if logger:
+            self.log = logger
+        else:
+            self.log = logging.getLogger("train_log")
+            logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
+            logging.root.setLevel(level=logging.INFO)
 
+        self.config = config
+
+        self.data_obj = None
+        self.model = None
+        # self.builder = tf.saved_model.builder.SavedModelBuilder("../pb_model/textcnn/bilstm/savedModel")
+
+        # 加载数据集
+        self.data_obj = DatasetLoader(config, logger=self.log)
+        self.label2index = self.data_obj.label2index
+        self.word_embedding = self.data_obj.word_embedding
+        self.label_list = [value for key, value in self.label2index.items()]
+
+        self.train_iter = self.load_data("train")
+        self.log.info("*** Train data size: {} ***".format(len(self.train_iter)))
+        self.vocab_size = self.data_obj.vocab_size
+        self.log.info("*** Vocab size: {} ***".format(self.vocab_size))
+
+        self.eval_iter = self.load_data("eval")
+        self.log.info("*** Eval data size: {} ***".format(len(self.eval_iter)))
+        self.log.info("Label numbers: {}".format(len(self.label_list)))
+
+    def load_data(self, mode):
+
+        """
+        创建数据对象
+        :return:
+        """
+        data_file = os.path.join(self.config.data_path, "thuc_news.{}.txt".format(mode))
+        pkl_file = os.path.join(self.config.data_path, "{}_data_pt_{}.pkl".format(mode, self.config.sequence_length))
+        if not os.path.exists(data_file):
+            raise FileNotFoundError
+        input_data = self.data_obj.build_dataset(data_file, pkl_file, mode)
+        iter = self.data_obj.build_iterator(input_data)
+        return iter
 
     # 权重初始化，默认xavier
     def init_network(self, model, method='xavier', exclude='embedding', seed=123):
@@ -46,10 +86,10 @@ class Trainer(object):
                     pass
 
 
-    def train(self, config, model, train_iter, dev_iter, test_iter):
+    def train(self, model, train_iter, dev_iter, test_iter):
         start_time = time.time()
         model.train()
-        optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.config.learning_rate)
 
         # 学习率指数衰减，每次epoch：学习率 = gamma * 学习率
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
@@ -58,8 +98,8 @@ class Trainer(object):
         last_improve = 0  # 记录上次验证集loss下降的batch数
         flag = False  # 记录是否很久没有效果提升
         writer = SummaryWriter(log_dir=config.log_path + '/' + time.strftime('%m-%d_%H.%M', time.localtime()))
-        for epoch in range(config.num_epochs):
-            print('Epoch [{}/{}]'.format(epoch + 1, config.num_epochs))
+        for epoch in range(self.config.num_epochs):
+            print('Epoch [{}/{}]'.format(epoch + 1, self.config.num_epochs))
             # scheduler.step() # 学习率衰减
             for i, (trains, labels) in enumerate(train_iter):
                 outputs = model(trains)
@@ -72,10 +112,10 @@ class Trainer(object):
                     true = labels.data.cpu()
                     predic = torch.max(outputs.data, 1)[1].cpu()
                     train_acc = metrics.accuracy_score(true, predic)
-                    dev_acc, dev_loss = self.evaluate(config, model, dev_iter)
+                    dev_acc, dev_loss = self.evaluate(model, dev_iter)
                     if dev_loss < dev_best_loss:
                         dev_best_loss = dev_loss
-                        torch.save(model.state_dict(), config.save_path)
+                        torch.save(model.state_dict(), self.config.save_path)
                         improve = '*'
                         last_improve = total_batch
                     else:
@@ -89,7 +129,7 @@ class Trainer(object):
                     writer.add_scalar("acc/dev", dev_acc, total_batch)
                     model.train()
                 total_batch += 1
-                if total_batch - last_improve > config.require_improvement:
+                if total_batch - last_improve > self.config.require_improvement:
                     # 验证集loss超过1000batch没下降，结束训练
                     print("No optimization for a long time, auto-stopping...")
                     flag = True
@@ -97,26 +137,27 @@ class Trainer(object):
             if flag:
                 break
         writer.close()
-        self.test(config, model, test_iter)
+        self.test(model, test_iter)
 
 
-    def test(self, config, model, test_iter):
+    def test(self, model, test_iter):
         # test
-        model.load_state_dict(torch.load(config.save_path))
+
+        model.load_state_dict(torch.load(self.config.ckpt_model_path))
         model.eval()
         start_time = time.time()
-        test_acc, test_loss, test_report, test_confusion = self.evaluate(config, model, test_iter, test=True)
+        test_acc, test_loss, test_report, test_confusion = self.evaluate(model, test_iter, test=True)
         msg = 'Test Loss: {0:>5.2},  Test Acc: {1:>6.2%}'
-        print(msg.format(test_loss, test_acc))
-        print("Precision, Recall and F1-Score...")
-        print(test_report)
-        print("Confusion Matrix...")
-        print(test_confusion)
+        self.log.info(msg.format(test_loss, test_acc))
+        self.log.info("Precision, Recall and F1-Score...")
+        self.log.info(test_report)
+        self.log.info("Confusion Matrix...")
+        self.log.info(test_confusion)
         time_dif = get_time_dif(start_time)
-        print("Time usage:", time_dif)
+        self.log.info("Time usage:", time_dif)
 
 
-    def evaluate(self, config, model, data_iter, test=False):
+    def evaluate(self, model, data_iter, test=False):
         model.eval()
         loss_total = 0
         predict_all = np.array([], dtype=int)
@@ -133,7 +174,7 @@ class Trainer(object):
 
         acc = metrics.accuracy_score(labels_all, predict_all)
         if test:
-            report = metrics.classification_report(labels_all, predict_all, target_names=config.class_list, digits=4)
+            report = metrics.classification_report(labels_all, predict_all, target_names=self.label_list, digits=4)
             confusion = metrics.confusion_matrix(labels_all, predict_all)
             return acc, loss_total / len(data_iter), report, confusion
         return acc, loss_total / len(data_iter)

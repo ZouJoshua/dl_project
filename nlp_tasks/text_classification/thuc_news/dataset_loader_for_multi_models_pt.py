@@ -35,13 +35,68 @@ class DatasetLoader(object):
             logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
             logging.root.setLevel(level=logging.INFO)
 
-        self.spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]
+        self.spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]  #特殊符号
 
-        self.word2idx_file = config.word2idx_file
+        self.config = config
+        self._data_path = config.data_path
+        self._word2idx_file = config.word2idx_file
+        self._label2idx_path = config.label2idx_path
+        self.embedding_dim = config.embedding_dim
+        self.sequence_length = config.sequence_length
+        self._pretrain_embedding_path = config.pretrain_embedding
+        self.vocab_size = None
+        self.word_embedding = None
+        self.word2index = None
+        self.label2index = None
+        self.word_pkl_file = os.path.join(self._data_path, "word2index.pkl")
+        self.label_pkl_file = os.path.join(self._data_path, "label2index.pkl")
+        self.word_embedding_path = os.path.join(self._data_path, "word_embedding.npy")
+        self.init_vocab_label()
+
+    def init_vocab_label(self, use_word=False):
+
+        if os.path.exists(self.word_pkl_file) and \
+                os.path.exists(self.label_pkl_file):
+            self.word2index, self.label2index = self.load_vocab_label(self.word_pkl_file, self.label_pkl_file)
+        else:
+            if use_word:
+                self.tokenizer = lambda x: x.split(' ')  # 以空格隔开，word-level
+            else:
+                self.tokenizer = lambda x: [y for y in x]  # char-level
+            all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
+            self.word2index, self.label2index = self.build_vocab(all_data_file, self.tokenizer)
+
+        self.vocab_size = len(self.word2index)
+        if self.config.vocab_size > len(self.word2index):
+            self.vocab_size = self.config.vocab_size
+
+        if os.path.exists(self.word_embedding_path):
+            self.log.info("Load word embedding from file: {}".format(self.word_embedding_path))
+            self.word_embedding = np.load(self.word_embedding_path)
 
 
 
-    def build_vocab(self, file_path, tokenizer, max_size, min_freq):
+    def load_vocab_label(self, vocab_file, label_file):
+
+        """
+        加载词汇和标签的映射表
+        :return:
+        """
+        # 将词汇-索引映射表加载出来
+        self.log.info("Load word2index from file: {}".format(vocab_file))
+        with open(vocab_file, "rb") as f:
+            word2index = pkl.load(f)
+
+        # 将标签-索引映射表加载出来
+        self.log.info("Load label2index from file: {}".format(label_file))
+        with open(label_file, "rb") as f:
+            label2index = pkl.load(f)
+
+        return word2index, label2index
+
+
+    def build_vocab(self, file_path, tokenizer, max_size=-1, min_freq=1):
+
         word_count = {}
         with open(file_path, 'r', encoding='UTF-8') as f:
             for line in tqdm(f):
@@ -54,9 +109,23 @@ class DatasetLoader(object):
             sort_word_count = sorted([_ for _ in word_count.items() if _[1] >= min_freq], key=lambda x: x[1], reverse=True)[:max_size]
             words = [item[0] for item in sort_word_count]
             all_words = self.spec_tokens + words
-            vocab_dic = {word: idx for idx, word in enumerate(all_words)}
+            word2index = {word: idx for idx, word in enumerate(all_words)}
             # vocab_dic.update({UNK: len(vocab_dic), PAD: len(vocab_dic) + 1})
-        return vocab_dic
+            pkl.dump(word2index, open(self.word_pkl_file, 'wb'))
+
+        label2index = self.get_label_to_index()
+        pkl.dump(label2index, open(self.label_pkl_file, "wb"))
+
+        return word2index, label2index
+
+
+
+    def get_label_to_index(self):
+        if os.path.exists(self._label2idx_path):
+            with open(self._label2idx_path, "r", encoding="utf-8") as fr:
+                return json.load(fr)
+        else:
+            raise FileNotFoundError
 
     def _get_text_and_label(self, dict_line):
         # 获取文本和标记
@@ -64,53 +133,121 @@ class DatasetLoader(object):
         label = dict_line["label"]
         return text, label
 
-def build_dataset(config, ues_word):
-    if ues_word:
-        tokenizer = lambda x: x.split(' ')  # 以空格隔开，word-level
-    else:
-        tokenizer = lambda x: [y for y in x]  # char-level
-    if os.path.exists(config.vocab_path):
-        vocab = pkl.load(open(config.vocab_path, 'rb'))
-    else:
-        vocab = build_vocab(config.train_path, tokenizer=tokenizer, max_size=MAX_VOCAB_SIZE, min_freq=1)
-        pkl.dump(vocab, open(config.vocab_path, 'wb'))
-    print(f"Vocab size: {len(vocab)}")
-
-    def load_dataset(path, pad_size=32):
-        contents = []
-        with open(path, 'r', encoding='UTF-8') as f:
-            for line in tqdm(f):
-                lin = line.strip()
-                if not lin:
+    def read_data(self, file, mode=""):
+        """
+        读取数据
+        :return: 返回分词后的文本内容和标签，inputs = [[]], labels = []
+        """
+        self.log.info("*** Read data from file:{}".format(file))
+        inputs = []
+        labels = []
+        with open(file, "r", encoding="utf-8") as f:
+            # 将数据集全部加载到内存
+            lines = [eval(line) for line in tqdm.tqdm(f, desc="Loading {} dataset".format(mode))]
+            # 打乱顺序
+            lines = shuffle(lines)
+            # 获取数据长度(条数)
+            # corpus_lines = len(lines)
+            for i, line in enumerate(lines):
+                try:
+                    text, label = self._get_text_and_label(line)
+                    inputs.append(text)
+                    labels.append(label)
+                except:
+                    self.log.warning("Error with line {}: {}".format(i, line))
                     continue
-                content, label = lin.split('\t')
-                words_line = []
-                token = tokenizer(content)
-                seq_len = len(token)
-                if pad_size:
-                    if len(token) < pad_size:
-                        token.extend([PAD] * (pad_size - len(token)))
-                    else:
-                        token = token[:pad_size]
-                        seq_len = pad_size
-                # word to id
-                for word in token:
-                    words_line.append(vocab.get(word, vocab.get(UNK)))
-                contents.append((words_line, int(label), seq_len))
-        return contents  # [([...], 0), ([...], 1), ...]
-    train = load_dataset(config.train_path, config.pad_size)
-    dev = load_dataset(config.dev_path, config.pad_size)
-    test = load_dataset(config.test_path, config.pad_size)
-    return vocab, train, dev, test
+        self.log.info("Read finished")
+
+        return inputs, labels
+
+
+    def build_dataset(self, data_file, pkl_file, mode="train"):
+
+        self.log.info("*** Build {} dataset")
+        if not os.path.exists(pkl_file):
+            self.log.info("*** Loading {} dataset from original file ***".format(mode))
+            # 1.读取原始数据
+            inputs, labels = self.read_data(data_file, mode)
+
+            # 2.输入转索引
+            inputs_idx = self.trans_sentences_to_index(inputs, self.word2index)
+            self.log.info("Index transform finished")
+
+            # 3.对输入做padding
+            inputs_idx, inputs_len = self.padding(inputs_idx, self.sequence_length)
+            self.log.info("Padding finished")
+
+            # 4.标签转索引
+            labels_idx = self.trans_labels_to_index(labels, self.label2index)
+            self.log.info("Label index transform finished")
+
+            corpus_data = zip(zip(inputs_idx, labels_idx), inputs_len)
+            pkl.dump(corpus_data, open(pkl_file, "wb"))
+
+        else:
+            self.log.info("Load existed {} data from pkl file: {}".format(mode, pkl_file))
+            corpus_data = pkl.load(open(pkl_file, "rb"))
+        self.log.info("Build finished ***")
+        return corpus_data
+
+
+    @staticmethod
+    def trans_sentences_to_index(inputs, word_to_index):
+        """
+        将输入转化为索引表示
+        :param inputs: 输入
+        :param word_to_index: 词汇-索引映射表
+        :return:
+        """
+
+        inputs_idx = [[word_to_index.get(word, word_to_index["<UNK>"]) for word in sentence] for sentence in inputs]
+
+        return inputs_idx
+
+    @staticmethod
+    def trans_labels_to_index(labels, label_to_index):
+        """
+        将标签也转换成数字表示
+        :param labels: 标签
+        :param label_to_index: 标签-索引映射表
+        :return:
+        """
+        labels_idx = [label_to_index[label] for label in labels]
+        return labels_idx
+
+    def padding(self, inputs, sequence_length):
+        """
+        对序列进行截断和补全
+        :param inputs: 输入
+        :param sequence_length: 预定义的序列长度
+        :return:
+        """
+        sentences_padding = []
+        sentences_lens = []
+        for sentence in inputs:
+            seq_len = len(sentence)
+            if seq_len < sequence_length:
+                sentence.extend([0] * (sequence_length - seq_len))
+            else:
+                sentence = sentence[:sequence_length]
+                seq_len = sequence_length
+            sentences_padding.append(sentence)
+            sentences_lens.append(seq_len)
+
+        return sentences_padding, sentences_lens
+
+    def build_iterator(self, dataset):
+        iter = DatasetIterater(dataset, self.config.batch_size, self.config.device)
+        return iter
 
 
 class DatasetIterater(object):
-    def __init__(self, batches, batch_size, device):
+    def __init__(self, inputs, batch_size, device):
         self.batch_size = batch_size
-        self.batches = batches
-        self.n_batches = len(batches) // batch_size
+        self.inputs = inputs
+        self.n_batches = len(inputs) // batch_size
         self.residue = False  # 记录batch数量是否为整数
-        if len(batches) % self.n_batches != 0:
+        if len(inputs) % self.n_batches != 0:
             self.residue = True
         self.index = 0
         self.device = device
@@ -125,7 +262,7 @@ class DatasetIterater(object):
 
     def __next__(self):
         if self.residue and self.index == self.n_batches:
-            batches = self.batches[self.index * self.batch_size: len(self.batches)]
+            batches = self.inputs[self.index * self.batch_size: len(self.inputs)]
             self.index += 1
             batches = self._to_tensor(batches)
             return batches
@@ -134,7 +271,7 @@ class DatasetIterater(object):
             self.index = 0
             raise StopIteration
         else:
-            batches = self.batches[self.index * self.batch_size: (self.index + 1) * self.batch_size]
+            batches = self.inputs[self.index * self.batch_size: (self.index + 1) * self.batch_size]
             self.index += 1
             batches = self._to_tensor(batches)
             return batches
@@ -147,11 +284,6 @@ class DatasetIterater(object):
             return self.n_batches + 1
         else:
             return self.n_batches
-
-
-def build_iterator(dataset, config):
-    iter = DatasetIterater(dataset, config.batch_size, config.device)
-    return iter
 
 
 def get_time_dif(start_time):
