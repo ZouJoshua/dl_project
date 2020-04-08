@@ -15,6 +15,7 @@ import torch
 import numpy as np
 import pickle as pkl
 from tqdm import tqdm
+from sklearn.utils import shuffle
 import time
 from datetime import timedelta
 import logging
@@ -26,7 +27,7 @@ import json
 class DatasetLoader(object):
 
     def __init__(self, config, logger=None):
-        super(DatasetLoader, self).__init__(config)
+        super(DatasetLoader, self).__init__()
 
         if logger:
             self.log = logger
@@ -40,10 +41,10 @@ class DatasetLoader(object):
         self.config = config
         self._data_path = config.data_path
         self._word2idx_file = config.word2idx_file
-        self._label2idx_path = config.label2idx_path
+        self._label2idx_file = config.label2idx_file
         self.embedding_dim = config.embedding_dim
         self.sequence_length = config.sequence_length
-        self._pretrain_embedding_path = config.pretrain_embedding
+        self._pretrain_embedding_path = config.pretrain_embedding_file
         self.vocab_size = None
         self.word_embedding = None
         self.word2index = None
@@ -54,7 +55,7 @@ class DatasetLoader(object):
         self.init_vocab_label()
 
     def init_vocab_label(self, use_word=False):
-
+        self.log.info("*** Init vocab and label ***")
         if os.path.exists(self.word_pkl_file) and \
                 os.path.exists(self.label_pkl_file):
             self.word2index, self.label2index = self.load_vocab_label(self.word_pkl_file, self.label_pkl_file)
@@ -73,7 +74,7 @@ class DatasetLoader(object):
         if os.path.exists(self.word_embedding_path):
             self.log.info("Load word embedding from file: {}".format(self.word_embedding_path))
             self.word_embedding = np.load(self.word_embedding_path)
-
+        self.log.info("*** Init finished ***")
 
 
     def load_vocab_label(self, vocab_file, label_file):
@@ -96,7 +97,7 @@ class DatasetLoader(object):
 
 
     def build_vocab(self, file_path, tokenizer, max_size=-1, min_freq=1):
-
+        self.log.info("Start dump file with word to index")
         word_count = {}
         with open(file_path, 'r', encoding='UTF-8') as f:
             for line in tqdm(f):
@@ -112,17 +113,18 @@ class DatasetLoader(object):
             word2index = {word: idx for idx, word in enumerate(all_words)}
             # vocab_dic.update({UNK: len(vocab_dic), PAD: len(vocab_dic) + 1})
             pkl.dump(word2index, open(self.word_pkl_file, 'wb'))
-
+        self.log.info("Dump {} words to file".format(len(word2index)))
+        self.log.info("Start dump file with label to index")
         label2index = self.get_label_to_index()
         pkl.dump(label2index, open(self.label_pkl_file, "wb"))
-
+        self.log.info("Dump down")
         return word2index, label2index
 
 
 
     def get_label_to_index(self):
-        if os.path.exists(self._label2idx_path):
-            with open(self._label2idx_path, "r", encoding="utf-8") as fr:
+        if os.path.exists(self._label2idx_file):
+            with open(self._label2idx_file, "r", encoding="utf-8") as fr:
                 return json.load(fr)
         else:
             raise FileNotFoundError
@@ -143,7 +145,7 @@ class DatasetLoader(object):
         labels = []
         with open(file, "r", encoding="utf-8") as f:
             # 将数据集全部加载到内存
-            lines = [eval(line) for line in tqdm.tqdm(f, desc="Loading {} dataset".format(mode))]
+            lines = [eval(line) for line in tqdm(f, desc="Loading {} dataset".format(mode))]
             # 打乱顺序
             lines = shuffle(lines)
             # 获取数据长度(条数)
@@ -156,14 +158,14 @@ class DatasetLoader(object):
                 except:
                     self.log.warning("Error with line {}: {}".format(i, line))
                     continue
-        self.log.info("Read finished")
+        self.log.info("Read finished ***")
 
         return inputs, labels
 
 
     def build_dataset(self, data_file, pkl_file, mode="train"):
 
-        self.log.info("*** Build {} dataset")
+        self.log.info("*** Build {} dataset".format(mode))
         if not os.path.exists(pkl_file):
             self.log.info("*** Loading {} dataset from original file ***".format(mode))
             # 1.读取原始数据
@@ -181,9 +183,9 @@ class DatasetLoader(object):
             labels_idx = self.trans_labels_to_index(labels, self.label2index)
             self.log.info("Label index transform finished")
 
-            corpus_data = zip(zip(inputs_idx, labels_idx), inputs_len)
+            corpus_data = zip(inputs_idx, labels_idx, inputs_len)
+            corpus_data = [(data[0], data[1], data[2]) for data in corpus_data]
             pkl.dump(corpus_data, open(pkl_file, "wb"))
-
         else:
             self.log.info("Load existed {} data from pkl file: {}".format(mode, pkl_file))
             corpus_data = pkl.load(open(pkl_file, "rb"))
@@ -301,24 +303,24 @@ if __name__ == "__main__":
     pretrain_dir = "./THUCNews/data/sgns.sogou.char"
     emb_dim = 300
     filename_trimmed_dir = "./THUCNews/data/embedding_SougouNews"
-    if os.path.exists(vocab_dir):
-        word_to_id = pkl.load(open(vocab_dir, 'rb'))
-    else:
-        # tokenizer = lambda x: x.split(' ')  # 以词为单位构建词表(数据集中词之间以空格隔开)
-        tokenizer = lambda x: [y for y in x]  # 以字为单位构建词表
-        word_to_id = build_vocab(train_dir, tokenizer=tokenizer, max_size=MAX_VOCAB_SIZE, min_freq=1)
-        pkl.dump(word_to_id, open(vocab_dir, 'wb'))
-
-    embeddings = np.random.rand(len(word_to_id), emb_dim)
-    f = open(pretrain_dir, "r", encoding='UTF-8')
-    for i, line in enumerate(f.readlines()):
-        # if i == 0:  # 若第一行是标题，则跳过
-        #     continue
-        lin = line.strip().split(" ")
-        if lin[0] in word_to_id:
-            idx = word_to_id[lin[0]]
-            emb = [float(x) for x in lin[1:301]]
-            embeddings[idx] = np.asarray(emb, dtype='float32')
-    f.close()
-    np.savez_compressed(filename_trimmed_dir, embeddings=embeddings)
+    # if os.path.exists(vocab_dir):
+    #     word_to_id = pkl.load(open(vocab_dir, 'rb'))
+    # else:
+    #     # tokenizer = lambda x: x.split(' ')  # 以词为单位构建词表(数据集中词之间以空格隔开)
+    #     tokenizer = lambda x: [y for y in x]  # 以字为单位构建词表
+    #     word_to_id = build_vocab(train_dir, tokenizer=tokenizer, max_size=MAX_VOCAB_SIZE, min_freq=1)
+    #     pkl.dump(word_to_id, open(vocab_dir, 'wb'))
+    #
+    # embeddings = np.random.rand(len(word_to_id), emb_dim)
+    # f = open(pretrain_dir, "r", encoding='UTF-8')
+    # for i, line in enumerate(f.readlines()):
+    #     # if i == 0:  # 若第一行是标题，则跳过
+    #     #     continue
+    #     lin = line.strip().split(" ")
+    #     if lin[0] in word_to_id:
+    #         idx = word_to_id[lin[0]]
+    #         emb = [float(x) for x in lin[1:301]]
+    #         embeddings[idx] = np.asarray(emb, dtype='float32')
+    # f.close()
+    # np.savez_compressed(filename_trimmed_dir, embeddings=embeddings)
 

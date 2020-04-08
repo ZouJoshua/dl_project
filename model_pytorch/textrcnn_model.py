@@ -16,19 +16,20 @@ from model_pytorch.basic_config import ConfigBase
 
 
 class Config(ConfigBase):
-    """textcnn_pytorch配置参数"""
+    """textrcnn_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
 
 
 
 
-class TextRCNNModel(nn.Module):
+class Model(nn.Module):
     """
     Recurrent Convolutional Neural Networks for Text Classification
     """
     def __init__(self, config):
-        super(TextRCNNModel, self).__init__()
+        super(Model, self).__init__()
         if config.pretrain_embedding_file is not None:
             self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
         else:

@@ -19,16 +19,17 @@ class Config(ConfigBase):
     """textrnn_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
         self.hidden_output_size = self.config.getint("hidden_output_size", 64)
         self.num_layers = self.config.getint("num_layers")  # lstm层数
 
 
-class TextRNNModel(nn.Module):
+class Model(nn.Module):
     """
     Recurrent Neural Network for Text Classification with Multi-Task Learning
     """
     def __init__(self, config):
-        super(TextRNNModel, self).__init__()
+        super(Model, self).__init__()
         if config.pretrain_embedding_file is not None:
             self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
         else:

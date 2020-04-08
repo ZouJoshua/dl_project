@@ -19,6 +19,7 @@ class Config(ConfigBase):
     """textrnn_attention_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
         self.hidden_output_size = self.config.getint("hidden_output_size", 64)
         self.num_layers = self.config.getint("num_layers")  # lstm层数
 
