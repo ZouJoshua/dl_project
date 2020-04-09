@@ -100,7 +100,8 @@ class Trainer(object):
         train_summary_path = os.path.join(self.config.output_path, "summary")
         if not os.path.exists(train_summary_path):
             os.makedirs(train_summary_path)
-        writer = SummaryWriter(log_dir=train_summary_path)
+        log_file = os.path.join(train_summary_path, time.strftime('%m-%d_%H.%M', time.localtime()))
+        writer = SummaryWriter(log_dir=log_file)
         for epoch in range(self.config.num_epochs):
             self.log.info("----- Epoch {}/{} -----".format(epoch + 1, self.config.num_epochs))
             # scheduler.step() # 学习率衰减

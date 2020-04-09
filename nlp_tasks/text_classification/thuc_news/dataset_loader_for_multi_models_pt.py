@@ -183,8 +183,8 @@ class DatasetLoader(object):
             labels_idx = self.trans_labels_to_index(labels, self.label2index)
             self.log.info("Label index transform finished")
 
-            corpus_data = zip(inputs_idx, labels_idx, inputs_len)
-            corpus_data = [(data[0], data[1], data[2]) for data in corpus_data]
+            _corpus_data = zip(inputs_idx, labels_idx, inputs_len)
+            corpus_data = [(data[0], data[1], data[2]) for data in _corpus_data]
             pkl.dump(corpus_data, open(pkl_file, "wb"))
         else:
             self.log.info("Load existed {} data from pkl file: {}".format(mode, pkl_file))
