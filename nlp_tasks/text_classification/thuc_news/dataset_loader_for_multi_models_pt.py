@@ -140,7 +140,7 @@ class DatasetLoader(object):
         读取数据
         :return: 返回分词后的文本内容和标签，inputs = [[]], labels = []
         """
-        self.log.info("*** Read data from file:{}".format(file))
+        self.log.info("Read data from file:{}".format(file))
         inputs = []
         labels = []
         with open(file, "r", encoding="utf-8") as f:
@@ -158,16 +158,16 @@ class DatasetLoader(object):
                 except:
                     self.log.warning("Error with line {}: {}".format(i, line))
                     continue
-        self.log.info("Read finished ***")
+        self.log.info("Read finished")
 
         return inputs, labels
 
 
     def build_dataset(self, data_file, pkl_file, mode="train"):
 
-        self.log.info("*** Build {} dataset".format(mode))
+        self.log.info("*** Build {} dataset ***".format(mode))
         if not os.path.exists(pkl_file):
-            self.log.info("*** Loading {} dataset from original file ***".format(mode))
+            self.log.info("Loading {} dataset from original file".format(mode))
             # 1.读取原始数据
             inputs, labels = self.read_data(data_file, mode)
 
@@ -189,7 +189,7 @@ class DatasetLoader(object):
         else:
             self.log.info("Load existed {} data from pkl file: {}".format(mode, pkl_file))
             corpus_data = pkl.load(open(pkl_file, "rb"))
-        self.log.info("Build finished ***")
+        self.log.info("*** Build finished ***")
         return corpus_data
 
 
