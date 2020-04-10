@@ -157,6 +157,9 @@ class DatasetLoader(DataBase):
         if os.path.exists(self.word_embedding_path):
             self.log.info("Load word embedding from file: {}".format(self.word_embedding_path))
             self.word_embedding = np.load(self.word_embedding_path)
+        elif os.path.exists(self._pretrain_embedding_path):
+            self.word_embedding = self.get_word_embedding()
+
 
     def gen_vocab(self, words, labels):
         """

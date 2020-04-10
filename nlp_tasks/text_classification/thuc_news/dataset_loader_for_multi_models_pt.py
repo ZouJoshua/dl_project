@@ -14,6 +14,7 @@ import os
 import torch
 import numpy as np
 import pickle as pkl
+import gensim
 from tqdm import tqdm
 from sklearn.utils import shuffle
 import time
@@ -51,7 +52,9 @@ class DatasetLoader(object):
         self.label2index = None
         self.word_pkl_file = os.path.join(self._data_path, "word2index.pkl")
         self.label_pkl_file = os.path.join(self._data_path, "label2index.pkl")
-        self.word_embedding_path = os.path.join(self._data_path, "word_embedding.npy")
+        self.word_embedding_file = os.path.join(self._data_path, "word_embedding.npy")
+        # self.word_embedding_file = os.path.join(self._data_path, "sougounews_embedding.npy")
+
         self.init_vocab_label()
 
     def init_vocab_label(self, use_word=False):
@@ -71,10 +74,14 @@ class DatasetLoader(object):
         if self.config.vocab_size > len(self.word2index):
             self.vocab_size = self.config.vocab_size
 
-        if os.path.exists(self.word_embedding_path):
-            self.log.info("Load word embedding from file: {}".format(self.word_embedding_path))
-            self.word_embedding = np.load(self.word_embedding_path)
+        if os.path.exists(self.word_embedding_file):
+            self.log.info("Load word embedding from file: {}".format(self.word_embedding_file))
+            self.word_embedding = np.load(self.word_embedding_file).astype('float32')
+        elif os.path.exists(self._pretrain_embedding_path):
+            self.word_embedding = self.get_word_embedding()
+
         self.log.info("*** Init finished ***")
+
 
 
     def load_vocab_label(self, vocab_file, label_file):
@@ -121,6 +128,53 @@ class DatasetLoader(object):
         return word2index, label2index
 
 
+    def get_word_embedding_from_gensim(self):
+        """
+        提取预训练词向量
+        :return:
+        """
+        self.log.info("*** Load embedding from pre-training file: {}".format(self._pretrain_embedding_path))
+        word_embedding = (1 / np.sqrt(len(self.word2index)) * (2 * np.random.rand(len(self.word2index), self.embedding_dim) - 1))
+        # word_embedding = np.random.rand(len(self.word2index), self.config.embedding_dim)
+
+        if os.path.splitext(self._pretrain_embedding_path)[-1] == ".bin":
+            word_vec = gensim.models.KeyedVectors.load_word2vec_format(self._pretrain_embedding_path, binary=True)
+        else:
+            word_vec = gensim.models.KeyedVectors.load_word2vec_format(self._pretrain_embedding_path)
+
+        for id, word in self.word2index.items():
+            try:
+                vector = word_vec.wv[word]
+                word_embedding[id, :] = vector
+            except:
+                self.log.warning("[{}]不存在于字向量中".format(word))
+        self.log.info("Load finished")
+        return word_embedding
+
+
+    def get_word_embedding(self):
+        """
+        提取预训练词向量
+        :return:
+        """
+        self.log.info("Load embedding from pre-training file: {}".format(self._pretrain_embedding_path))
+        word_embedding = (1 / np.sqrt(self.vocab_size) * (2 * np.random.rand(self.vocab_size, self.embedding_dim) - 1))
+
+        # word_embedding = np.random.rand(self.vocab_size, self.config.embedding_dim)
+        f = open(self._pretrain_embedding_path, "r", encoding='UTF-8')
+        for i, line in enumerate(f.readlines()):
+            if i == 0:  # 若第一行是标题，则跳过
+                continue
+            lin = line.strip().split(" ")
+            if lin[0] in self.word2index:
+                idx = self.word2index[lin[0]]
+                emb = [float(x) for x in lin[1:self.config.embedding_dim+1]]
+                word_embedding[idx] = np.asarray(emb, dtype='float32')
+        f.close()
+        np.save(self.word_embedding_file, word_embedding)
+        # np.savez_compressed(self.word_embedding_file, embeddings=word_embedding)
+        self.log.info("Load finished")
+        return word_embedding
 
     def get_label_to_index(self):
         if os.path.exists(self._label2idx_file):
@@ -298,29 +352,18 @@ def get_time_dif(start_time):
 if __name__ == "__main__":
     '''提取预训练词向量'''
     # 下面的目录、文件名按需更改。
-    train_dir = "./THUCNews/data/train.txt"
-    vocab_dir = "./THUCNews/data/vocab.pkl"
-    pretrain_dir = "./THUCNews/data/sgns.sogou.char"
-    emb_dim = 300
-    filename_trimmed_dir = "./THUCNews/data/embedding_SougouNews"
-    # if os.path.exists(vocab_dir):
-    #     word_to_id = pkl.load(open(vocab_dir, 'rb'))
-    # else:
-    #     # tokenizer = lambda x: x.split(' ')  # 以词为单位构建词表(数据集中词之间以空格隔开)
-    #     tokenizer = lambda x: [y for y in x]  # 以字为单位构建词表
-    #     word_to_id = build_vocab(train_dir, tokenizer=tokenizer, max_size=MAX_VOCAB_SIZE, min_freq=1)
-    #     pkl.dump(word_to_id, open(vocab_dir, 'wb'))
-    #
-    # embeddings = np.random.rand(len(word_to_id), emb_dim)
-    # f = open(pretrain_dir, "r", encoding='UTF-8')
+    _pretrain_embedding_path = "/data/work/dl_project/data/pretrained_embedding/sgns.sogou.char"
+    # embedding_dim =
+    # word_embedding_file =
+    # embeddings = np.random.rand(len(word2index), embedding_dim)
+    word_vec = gensim.models.KeyedVectors.load_word2vec_format(_pretrain_embedding_path)
+    print(word_vec.wv["我"])
+    # f = open(_pretrain_embedding_path, "r", encoding="utf-8")
     # for i, line in enumerate(f.readlines()):
-    #     # if i == 0:  # 若第一行是标题，则跳过
-    #     #     continue
+    #     if i > 10:  # 若第一行是标题，则跳过
+    #         break
     #     lin = line.strip().split(" ")
-    #     if lin[0] in word_to_id:
-    #         idx = word_to_id[lin[0]]
-    #         emb = [float(x) for x in lin[1:301]]
-    #         embeddings[idx] = np.asarray(emb, dtype='float32')
+    #     print(lin)
+    #     emb = [float(x) for x in lin[1:301]]
     # f.close()
-    # np.savez_compressed(filename_trimmed_dir, embeddings=embeddings)
-
+    # np.savez_compressed(word_embedding_file, embeddings=embeddings)

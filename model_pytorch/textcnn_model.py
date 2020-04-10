@@ -28,10 +28,10 @@ class Model(nn.Module):
     """
     Convolutional Neural Networks for Sentence Classification
     """
-    def __init__(self, config):
+    def __init__(self, config, pretrain_embedding=None):
         super(Model, self).__init__()
-        if config.pretrain_embedding_file is not None:
-            self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
+        if pretrain_embedding is not None:
+            self.embedding = nn.Embedding.from_pretrained(torch.tensor(pretrain_embedding), freeze=False)
         else:
             self.embedding = nn.Embedding(config.vocab_size, config.embedding_dim, padding_idx=config.vocab_size - 1)
         self.convs = nn.ModuleList(

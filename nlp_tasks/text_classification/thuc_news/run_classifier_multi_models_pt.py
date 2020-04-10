@@ -142,10 +142,10 @@ class Trainer(object):
                     writer.add_scalar("acc/dev", dev_acc, total_batch)
                     # model.train()
                     if total_batch - last_improve > self.config.require_improvement:
-                        # 验证集loss超过1000batch没下降，结束训练
+                        # 验证集loss超过10个batch没下降，结束训练
                         self.log.info("No optimization for a long time, auto-stopping...")
                         flag = True
-                        # break
+                        break
             if flag:
                 break
         writer.close()
@@ -162,9 +162,9 @@ class Trainer(object):
         msg = 'Test Loss: {0:>5.2},  Test Acc: {1:>6.2%}'
         self.log.info(msg.format(test_loss, test_acc))
         self.log.info("Precision, Recall and F1-Score...")
-        self.log.info(test_report)
+        self.log.info("\n{}".format(test_report))
         self.log.info("Confusion Matrix...")
-        self.log.info(test_confusion)
+        self.log.info("\n{}".format(test_confusion))
         time_dif = get_time_dif(start_time)
         self.log.info("Time usage:{}".format(time_dif))
 
@@ -227,7 +227,8 @@ def train_model():
     log.info(json.dumps(config.all_params, indent=4))
     # train
     trainer = Trainer(config, logger=log)
-    model = x.Model(config).to(config.device)
+    # print(trainer.word_embedding.shape)
+    model = x.Model(config, pretrain_embedding=trainer.word_embedding).to(config.device)
     if model_name != 'Transformer':
         trainer.init_network(model)
     trainer.train(model)
