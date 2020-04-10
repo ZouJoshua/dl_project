@@ -42,7 +42,7 @@ class Trainer(object):
         self.data_obj = DatasetLoader(config, logger=self.log)
         self.label2index = self.data_obj.label2index
         self.word_embedding = self.data_obj.word_embedding
-        self.label_list = [value for key, value in self.label2index.items()]
+        self.label_list = [kv[0] for kv in sorted(self.label2index.items(), key=lambda item: item[1])]
 
         self.train_iter, self.train_size = self.load_data("train")
         self.log.info("*** Train data size: {} ***".format(self.train_size))
@@ -53,7 +53,7 @@ class Trainer(object):
         self.log.info("*** Eval data size: {} ***".format(self.eval_size))
         self.log.info("Label numbers: {}".format(len(self.label_list)))
 
-        # if self.config.model_name != 'transformer':
+        # if self.config.model_name != 'transformer_pytorch':
         #     self.init_network(self.model)
         self.save_path = os.path.join(self.config.ckpt_model_path, "{}.ckpt".format(self.config.model_name))
 
@@ -90,6 +90,7 @@ class Trainer(object):
 
 
     def train(self, model):
+        self.log.info("*** 模型结构:{} ***".format(model.parameters))
         start_time = time.time()
         optimizer = torch.optim.Adam(model.parameters(), lr=self.config.learning_rate)
 
@@ -109,16 +110,15 @@ class Trainer(object):
             self.log.info("----- Epoch {}/{} -----".format(epoch + 1, self.config.num_epochs))
             # scheduler.step() # 学习率衰减
             for i, (trains, labels) in enumerate(self.train_iter):
-                self.log.info("数据:{}".format(trains))
-                self.log.info("label:{}".format(labels))
+                total_batch += 1
+                # self.log.info("数据:{}".format(trains))
+                # self.log.info("label:{}".format(labels))
                 optimizer.zero_grad()
-                self.log.info("清除梯度")
                 outputs = model.forward(trains)
                 loss = F.cross_entropy(outputs, labels)
-                self.log.info("计算batch的损失:{}".format(loss))
                 loss.backward()
-                self.log.info("反向更新求梯度")
                 optimizer.step()
+                # self.log.info("train-step:{} Loss:{}".format(total_batch, loss))
 
                 if total_batch % self.config.eval_every_step == 0:
                     # 每多少轮输出在训练集和验证集上的效果
@@ -134,19 +134,18 @@ class Trainer(object):
                     else:
                         improve = ''
                     time_dif = get_time_dif(start_time)
-                    msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
+                    msg = "Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}"
                     self.log.info(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
                     writer.add_scalar("loss/train", loss.item(), total_batch)
                     writer.add_scalar("loss/dev", dev_loss, total_batch)
                     writer.add_scalar("acc/train", train_acc, total_batch)
                     writer.add_scalar("acc/dev", dev_acc, total_batch)
                     # model.train()
-                total_batch += 1
-                if total_batch - last_improve > self.config.require_improvement:
-                    # 验证集loss超过1000batch没下降，结束训练
-                    self.log.info("No optimization for a long time, auto-stopping...")
-                    flag = True
-                    break
+                    if total_batch - last_improve > self.config.require_improvement:
+                        # 验证集loss超过1000batch没下降，结束训练
+                        self.log.info("No optimization for a long time, auto-stopping...")
+                        flag = True
+                        # break
             if flag:
                 break
         writer.close()
@@ -167,7 +166,7 @@ class Trainer(object):
         self.log.info("Confusion Matrix...")
         self.log.info(test_confusion)
         time_dif = get_time_dif(start_time)
-        self.log.info("Time usage:", time_dif)
+        self.log.info("Time usage:{}".format(time_dif))
 
 
     def evaluate(self, model, data_iter, test=False):
@@ -223,7 +222,7 @@ def train_model():
     if not os.path.exists(output):
         os.makedirs(output)
     log_file = os.path.join(output, '{}_train_log'.format(config.model_name))
-    log = Logger("train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
+    log = Logger("train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
     log.info(json.dumps(config.all_params, indent=4))
     # train
@@ -231,7 +230,6 @@ def train_model():
     model = x.Model(config).to(config.device)
     if model_name != 'Transformer':
         trainer.init_network(model)
-    log.info("*** 模型参数:{} ***".format(model.parameters))
     trainer.train(model)
 
 
