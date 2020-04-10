@@ -40,14 +40,14 @@ class Model(nn.Module):
         self.fc = nn.Linear(config.num_filters * len(config.filter_sizes), config.num_labels)
 
     def conv_and_pool(self, x, conv):
-        x = F.relu(conv(x)).squeeze(3)
-        x = F.max_pool1d(x, x.size(2)).squeeze(2)
+        x = F.relu(conv(x)).squeeze(3)  # len(filter_sizes)*(N,num_filters,W)
+        x = F.max_pool1d(x, x.size(2)).squeeze(2)  # len(filter_sizes)*(N,num_filters)
         return x
 
     def forward(self, x):
-        out = self.embedding(x[0])
-        out = out.unsqueeze(1)
-        out = torch.cat([self.conv_and_pool(out, conv) for conv in self.convs], 1)
+        out = self.embedding(x[0])  # (N,W,D)
+        out = out.unsqueeze(1)  # (N,channel,W,D)
+        out = torch.cat([self.conv_and_pool(out, conv) for conv in self.convs], 1)  #(N,num_filters*len(filter_sizes))
         out = self.dropout(out)
-        out = self.fc(out)
-        return out
+        logit = self.fc(out)
+        return logit

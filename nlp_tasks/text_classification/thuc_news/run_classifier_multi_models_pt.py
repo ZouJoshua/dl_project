@@ -35,8 +35,8 @@ class Trainer(object):
 
         self.config = config
 
-        self.data_obj = None
         self.model = None
+        self.data_obj = None
 
         # 加载数据集
         self.data_obj = DatasetLoader(config, logger=self.log)
@@ -52,6 +52,9 @@ class Trainer(object):
         self.eval_iter, self.eval_size = self.load_data("eval")
         self.log.info("*** Eval data size: {} ***".format(self.eval_size))
         self.log.info("Label numbers: {}".format(len(self.label_list)))
+
+        # if self.config.model_name != 'transformer':
+        #     self.init_network(self.model)
         self.save_path = os.path.join(self.config.ckpt_model_path, "{}.ckpt".format(self.config.model_name))
 
 
@@ -88,9 +91,9 @@ class Trainer(object):
 
     def train(self, model):
         start_time = time.time()
-        model.train()
         optimizer = torch.optim.Adam(model.parameters(), lr=self.config.learning_rate)
 
+        model.train()
         # 学习率指数衰减，每次epoch：学习率 = gamma * 学习率
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         total_batch = 0  # 记录进行到多少batch
@@ -106,11 +109,17 @@ class Trainer(object):
             self.log.info("----- Epoch {}/{} -----".format(epoch + 1, self.config.num_epochs))
             # scheduler.step() # 学习率衰减
             for i, (trains, labels) in enumerate(self.train_iter):
-                outputs = model(trains)
-                model.zero_grad()
+                self.log.info("数据:{}".format(trains))
+                self.log.info("label:{}".format(labels))
+                optimizer.zero_grad()
+                self.log.info("清除梯度")
+                outputs = model.forward(trains)
                 loss = F.cross_entropy(outputs, labels)
+                self.log.info("计算batch的损失:{}".format(loss))
                 loss.backward()
+                self.log.info("反向更新求梯度")
                 optimizer.step()
+
                 if total_batch % self.config.eval_every_step == 0:
                     # 每多少轮输出在训练集和验证集上的效果
                     true = labels.data.cpu()
@@ -131,7 +140,7 @@ class Trainer(object):
                     writer.add_scalar("loss/dev", dev_loss, total_batch)
                     writer.add_scalar("acc/train", train_acc, total_batch)
                     writer.add_scalar("acc/dev", dev_acc, total_batch)
-                    model.train()
+                    # model.train()
                 total_batch += 1
                 if total_batch - last_improve > self.config.require_improvement:
                     # 验证集loss超过1000batch没下降，结束训练
@@ -214,7 +223,7 @@ def train_model():
     if not os.path.exists(output):
         os.makedirs(output)
     log_file = os.path.join(output, '{}_train_log'.format(config.model_name))
-    log = Logger("train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
+    log = Logger("train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
     log.info(json.dumps(config.all_params, indent=4))
     # train
@@ -222,6 +231,7 @@ def train_model():
     model = x.Model(config).to(config.device)
     if model_name != 'Transformer':
         trainer.init_network(model)
+    log.info("*** 模型参数:{} ***".format(model.parameters))
     trainer.train(model)
 
 
