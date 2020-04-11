@@ -192,6 +192,85 @@ class Trainer(object):
         return acc, loss_total / len(data_iter)
 
 
+class Predictor(object):
+
+    def __init__(self, config, model, logger=None):
+
+        if logger:
+            self.log = logger
+        else:
+            self.log = logging.getLogger("train_log")
+            logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
+            logging.root.setLevel(level=logging.INFO)
+
+        self.config = config
+
+        self.model = model
+        self.data_obj = None
+
+        # 加载数据集
+        self.data_obj = DatasetLoader(config, logger=self.log)
+
+        self.word2index, self.label2index = self.data_obj.word2index, self.data_obj.label2index
+        self.index2label = {value: key for key, value in self.label2index.items()}
+        self.vocab_size = len(self.word2index)
+        self.sequence_length = self.config.sequence_length
+
+        self.save_path = os.path.join(self.config.ckpt_model_path, "{}.ckpt".format(self.config.model_name))
+        self.load_model()
+
+    def load_model(self):
+
+        if os.path.exists(self.save_path):
+            self.log.info('Reloading model parameters..')
+            self.model.load_state_dict(torch.load(self.save_path))
+            self.model.eval()
+            torch.cuda.empty_cache()
+            self.model.to(self.config.device)
+            self.log.info("{} loaded!".format(self.save_path))
+        else:
+            raise ValueError('No such file:[{}]'.format(self.save_path))
+
+
+    def sentence_to_idx(self, sentence):
+        """
+        将分词后的句子转换成idx表示
+        :param sentence:
+        :return:
+        """
+        sentence_ids = [self.word2index.get(token, self.word2index["<UNK>"]) for token in sentence]
+        sentence_pad = sentence_ids[: self.sequence_length] if len(sentence_ids) > self.sequence_length \
+            else sentence_ids + [0] * (self.sequence_length - len(sentence_ids))
+        return sentence_pad
+
+    def predict(self, sentence):
+        """
+        给定分词后的句子，预测其分类结果
+        :param sentence:
+        :return:
+        """
+        sentence_ids = self.sentence_to_idx(sentence)
+
+        outputs = self.model.forward(sentence_ids)
+        prediction = torch.max(outputs.data, 1)[1].cpu()
+        label = self.index2label[prediction]
+        return label
+
+
+    def predict_batch(self, sentences):
+
+        sentences_ids = list()
+        for sentence in sentences:
+            sentence_ids = self.sentence_to_idx(sentence)
+            sentences_ids.append(sentence_ids)
+
+        input_ids = torch.LongTensor(sentences_ids).to(self.config.device)
+        outputs = self.model.forward((input_ids, None))
+        predictions = torch.max(outputs.data, 1)[1].cpu().numpy()
+        labels = [self.index2label[pre] for pre in predictions]
+        return labels
+
+
 def train_model():
     """
     :return:
@@ -234,11 +313,133 @@ def train_model():
     trainer.train(model)
 
 
+def predict_to_file():
+    """
+    预测验证
+    :return:
+    """
+    import time
+    model_name = "textcnn"
+    x = import_module('model_pytorch.{}_model'.format(model_name))
+    conf_file = os.path.join(CONFIG_PATH, "{}_pytorch.ini".format(model_name))
+    config = x.Config(conf_file, section="THUC_NEWS")
+
+    log_file = os.path.join(config.output_path, '{}_predict_log'.format(config.model_name))
+    log = Logger("train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
+    log.info("*** Init all params ***")
+    log.info(json.dumps(config.all_params, indent=4))
+
+    model = x.Model(config).to(config.device)
+    predictor = Predictor(config, model, logger=log)
+    files = [os.path.join(config.data_path, "thuc_news.{}.txt".format(i)) for i in ["train", "eval", "test"]]
+    # files = [os.path.join(config.data_path, "thuc_news.{}.txt".format(i)) for i in ["test"]]
+    predict_file = os.path.join(config.output_path, "thuc_news.predict.txt")
+    e = time.time()
+    batch_size = 128
+    with open(predict_file, "w", encoding="utf-8") as wf:
+        for file in files:
+            file_type = os.path.split(file)[1].split(".")[1]
+            with open(file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+                num_batches = len(lines) // batch_size
+                for i in range(num_batches + 1):
+                    if i+1 % 100 == 0:
+                        log.info("已处理{}条".format((i+1) * batch_size))
+
+                    start = i * batch_size
+                    end = start + batch_size
+                    text_batch = list()
+                    true_labels = list()
+                    ids = list()
+                    if end > len(lines):
+                        _lines = lines[start:]
+                    else:
+                        _lines = lines[start:end]
+
+                    for i, _line in enumerate(_lines):
+                        line = json.loads(_line.strip())
+                        ids.append(start + i)
+                        true_labels.append(line["label"])
+                        text_batch.append(line["text"])
+
+                    predict_labels = predictor.predict_batch(text_batch)
+                    for j, _ in enumerate(predict_labels):
+                        out = dict()
+                        out["guid"] = "{}-{}".format(file_type, ids[j])
+                        out["true_label"] = true_labels[j]
+                        out["predict_label"] = predict_labels[j]
+                        if out:
+                            wf.write(json.dumps(out, ensure_ascii=False) + "\n")
+                            wf.flush()
+
+
+
+                # 预测单条
+                # for i, _line in enumerate(lines):
+                #     line = json.loads(_line.strip())
+                #     out = dict()
+                #     out["guid"] = "{}-{}".format(file_type, i)
+                #     out["true_label"] = line["label"]
+                #     out["predict_label"] = predictor.predict(line["text"])
+                #     if out:
+                #         wf.write(json.dumps(out, ensure_ascii=False) + "\n")
+    s = time.time()
+    log.info("*** 预测完成")
+    log.info("预测耗时: {}s".format(s - e))
+    log.info("*** 预测结果评估 ***")
+    predict_report(predict_file, log)
+    log.info("*** 评估完成 ***")
+
+def predict_report(file, log):
+    """
+    预测结果评估
+    :return:
+    """
+    from sklearn.metrics import classification_report
+    from evaluate.metrics import get_multi_metrics
+    import json
+    # file = "/data/work/dl_project/data/corpus/thuc_news/thuc_news.predict.txt"
+    result = dict()
+    result["train"] = (list(), list())
+    result["eval"] = (list(), list())
+    result["test"] = (list(), list())
+    with open(file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+        for _line in lines:
+            line = json.loads(_line.strip())
+            guid = line["guid"]
+            mode = guid.split("-")[0]
+            true_y = line["true_label"]
+            pred_y = line["predict_label"]
+            if mode == "train":
+                result["train"][0].append(true_y)
+                result["train"][1].append(pred_y)
+            elif mode == "eval":
+                result["eval"][0].append(true_y)
+                result["eval"][1].append(pred_y)
+            elif mode == "test":
+                result["test"][0].append(true_y)
+                result["test"][1].append(pred_y)
+
+    labels_list = ['财经', '彩票', '房产', '股票', '家居', '教育', '科技',
+                   '社会', '时尚', '时政', '体育', '星座', '游戏', '娱乐']
+    for k, v in result.items():
+        log.info("{}的整体性能:".format(k))
+        acc, recall, F1 = get_multi_metrics(v[0], v[1])
+        log.info('\n----模型整体 ----\nacc_score:\t{} \nrecall:\t{} \nf1_score:\t{} '.format(acc, recall, F1))
+        log.info("{}的详细结果:".format(k))
+        class_report = classification_report(v[0], v[1], labels=labels_list)
+        log.info('\n----结果报告 ---:\n{}'.format(class_report))
+
+
+
+
 
 
 def main():
-    train_model()
-
+    # train_model()
+    predict_to_file()
 
 if __name__ == "__main__":
     main()

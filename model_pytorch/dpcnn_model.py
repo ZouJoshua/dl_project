@@ -19,6 +19,8 @@ class Config(ConfigBase):
     """dpcnn_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设备
         self.num_filters = self.config.getint("num_filters")  # 卷积核数量(channels数)
 
 
@@ -26,10 +28,10 @@ class Model(nn.Module):
     """
     Deep Pyramid Convolutional Neural Networks for Text Categorization
     """
-    def __init__(self, config):
+    def __init__(self, config, pretrain_embedding=None):
         super(Model, self).__init__()
-        if config.pretrain_embedding_file is not None:
-            self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
+        if pretrain_embedding is not None:
+            self.embedding = nn.Embedding.from_pretrained(pretrain_embedding, freeze=False)
         else:
             self.embedding = nn.Embedding(config.vocab_size, config.embedding_dim, padding_idx=config.vocab_size - 1)
         self.conv_region = nn.Conv2d(1, config.num_filters, (3, config.embedding_dim), stride=1)

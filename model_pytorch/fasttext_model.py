@@ -18,17 +18,19 @@ class Config(ConfigBase):
     """fasttext_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设备
         self.ngram_vocab_size = self.config.getint("ngram_vocab_size", 200000)  # ngram 词表大小
 
 
-class FasttextModel(nn.Module):
+class Model(nn.Module):
     """
     Bag of Tricks for Efficient Text Classification
     """
-    def __init__(self, config):
-        super(FasttextModel, self).__init__()
-        if config.pretrain_embedding_file is not None:
-            self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
+    def __init__(self, config, pretrain_embedding=None):
+        super(Model, self).__init__()
+        if pretrain_embedding is not None:
+            self.embedding = nn.Embedding.from_pretrained(pretrain_embedding, freeze=False)
         else:
             self.embedding = nn.Embedding(config.vocab_size, config.embedding_dim, padding_idx=config.vocab_size - 1)
         self.embedding_ngram2 = nn.Embedding(config.ngram_vocab_size, config.embedding_dim)

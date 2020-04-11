@@ -20,6 +20,7 @@ class Config(ConfigBase):
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
 
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设备
         self.tokenizer = BertTokenizer.from_pretrained(self.init_checkpoint_path)
         self.rnn_hidden = self.config.getint("rnn_hidden", 256)
         self.num_layers = self.config.getint("num_layers", 2)  # lstm层数

@@ -18,6 +18,8 @@ class Config(ConfigBase):
     """ERNIE_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设备
         self.tokenizer = BertTokenizer.from_pretrained(self.init_checkpoint_path)
         self.num_filters = self.config.getint("num_filters")  # 卷积核数量(channels数)
 

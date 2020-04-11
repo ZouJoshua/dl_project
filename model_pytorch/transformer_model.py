@@ -21,13 +21,14 @@ class Config(ConfigBase):
     """transformer_pytorch配置参数"""
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
         self.num_layers = self.config.getint("num_layers")  # lstm层数
         self.dim_model = self.config.getint("dim_model", 300)
         self.hidden_size = self.config.getint("hidden_size", 1024)  # 隐藏层大小
         self.last_hidden_size = self.config.getint("last_hidden_size", 512)
         self.num_head = self.config.getint("num_head", 5)  # head个数
         self.num_encoder = self.config.getint("num_encoder", 2)  # encoder块个数
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # 设备
 
 
 
@@ -35,10 +36,10 @@ class AttentionModel(nn.Module):
     """
     Attention Is All You Need
     """
-    def __init__(self, config):
+    def __init__(self, config, pretrain_embedding=None):
         super(AttentionModel, self).__init__()
-        if config.pretrain_embedding_file is not None:
-            self.embedding = nn.Embedding.from_pretrained(config.pretrain_embedding_file, freeze=False)
+        if pretrain_embedding is not None:
+            self.embedding = nn.Embedding.from_pretrained(pretrain_embedding, freeze=False)
         else:
             self.embedding = nn.Embedding(config.vocab_size, config.embedding_dim, padding_idx=config.vocab_size - 1)
 
