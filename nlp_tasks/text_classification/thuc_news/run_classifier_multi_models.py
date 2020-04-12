@@ -63,6 +63,7 @@ class Trainer(TrainerBase):
         self.log.info("*** Vocab size: {} ***".format(self.vocab_size))
 
         self.log.info("*** Label numbers: {} ***".format(len(self.label_list)))
+        self.log.info("{}".format(self.label_list))
 
         self.train_inputs, self.train_labels = self.load_data("train")
         self.log.info("*** Train data size: {} ***".format(len(self.train_labels)))
@@ -155,13 +156,13 @@ class Trainer(TrainerBase):
                         #                                               labels=self.label_list)
                         # self.log.info("train-step: {}, loss: {}, acc: {}, recall: {}, precision: {}, f_beta: {}".format(
                         #     global_step, loss, acc, recall, prec, f_beta))
-                        msg = "train-step: {0:>6}, loss:{1:>5.2}, acc:{2:>6.2%}, recall:{3:>6.2%}, F1_score:{4:>6.2%}"
+                        msg = "train-step: {0:>6}, loss:{1:>5.4}, acc:{2:>6.2%}, recall:{3:>6.2%}, F1_score:{4:>6.2%}"
                         acc, recall, F1 = get_multi_metrics(pred_y=predictions, true_y=batch["y"])
 
                         self.log.info(msg.format(global_step, loss, acc, recall, F1))
 
                     if self.data_obj and global_step % self.config.eval_every_step == 0:
-                        dev_loss, dev_acc = self.evaluate(sess, eval_summary_writer)
+                        dev_loss, dev_acc = self.evaluate(sess, eval_summary_writer, test=True)
 
                         if dev_loss < dev_best_loss:
                             dev_best_loss = dev_loss
@@ -223,8 +224,8 @@ class Trainer(TrainerBase):
             summary_writer.flush()
 
             loss_list.append(loss)
-            labels_all.append(batch_data["y"])
-            predict_all.append(predictions)
+            labels_all.extend(batch_data["y"])
+            predict_all.extend(predictions)
 
             if self.config.num_labels == 1:
                 acc, auc, recall, prec, f_beta = get_binary_metrics(pred_y=predictions,
@@ -245,10 +246,10 @@ class Trainer(TrainerBase):
                 f1_list.append(F1)
 
         if self.config.num_labels == 1:
-            msg = "\neval_step loss:{0:>5.2}, acc:{1:>6.2%}, auc:{2:>6.2%}, recall:{3:>6.2%}, precision:{4:>6.2%}, f_beta:{5:>6.2%}"
+            msg = "eval-step loss:{0:>5.2}, acc:{1:>6.2%}, auc:{2:>6.2%}, recall:{3:>6.2%}, precision:{4:>6.2%}, f_beta:{5:>6.2%}"
             self.log.info(msg.format(mean(loss_list), mean(acc_list), mean(auc_list), mean(recall_list), mean(prec_list), mean(f1_list)))
         elif self.config.num_labels > 1:
-            msg = "\neval_step loss:{0:>5.2}, acc:{1:>6.2%}, recall:{2:>6.2%}, F1_score:{3:>6.2%}"
+            msg = "eval-step loss:{0:>5.2}, acc:{1:>6.2%}, recall:{2:>6.2%}, F1_score:{3:>6.2%}"
             self.log.info(msg.format(mean(loss_list), mean(acc_list), mean(recall_list), mean(f1_list)))
 
         if test:
@@ -258,9 +259,8 @@ class Trainer(TrainerBase):
             self.log.info("\n{}".format(report))
             self.log.info("confusion matrix...")
             self.log.info("\n{}".format(confusion))
-            return mean(loss_list), mean(acc_list), report, confusion
-        else:
-            return mean(loss_list), mean(acc_list)
+
+        return mean(loss_list), mean(acc_list)
 
 
 
