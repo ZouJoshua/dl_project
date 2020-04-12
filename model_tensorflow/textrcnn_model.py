@@ -3,59 +3,21 @@
 """
 @Author  : Joshua
 @Time    : 19-6-3 下午5:05
-@File    : textrnn_model.py
+@File    : textrcnn_model.py
 @Desc    : 
 """
 
 import tensorflow as tf
 
 from model_tensorflow.basic_model import BaseModel
-import configparser
+from model_tensorflow.basic_config import ConfigBase
 
 
-class Config(object):
+class Config(ConfigBase):
     """RCNN配置参数"""
-    def __init__(self, config_file, section=None):
-        config_ = configparser.ConfigParser()
-        config_.read(config_file)
-        if not config_.has_section(section):
-            raise Exception("Section={} not found".format(section))
-
-        self.all_params = {}
-        for i in config_.items(section):
-            self.all_params[i[0]] = i[1]
-
-        config = config_[section]
-        if not config:
-            raise Exception("Config file error.")
-        self.data_path = config.get("data_path")                           # 数据目录
-        self.label2idx_path = config.get("label2idx_path")                 # label映射文件
-        self.pretrain_embedding = config.get("pretrain_embedding")         # 预训练词向量文件
-        self.stopwords_path = config.get("stopwords_path", "")             # 停用词文件
-        self.output_path = config.get("output_path")                       # 输出目录(模型文件\)
-        self.ckpt_model_path = config.get("ckpt_model_path", "")           # 模型目录
-        self.sequence_length = config.getint("sequence_length")            # 序列长度
-        self.num_labels = config.getint("num_labels")                      # 类别数,二分类时置为1,多分类时置为实际类别数
-        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
-        self.vocab_size = config.getint("vocab_size")                      # 字典大小
-        self.hidden_sizes = eval(config.get("hidden_sizes", "[256,256]"))  # lstm的隐层大小，列表对象，支持多层lstm，只要在列表中添加相应的层对应的隐层大小
-        self.output_size = config.getint("output_size")                    # 从高维映射到低维的神经元个数
-
-        self.is_training = config.getboolean("is_training", False)
-        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
-        self.optimization = config.get("optimization", "adam")             # 优化算法
-        self.learning_rate = config.getfloat("learning_rate")              # 学习速率
-        self.learning_decay_rate = config.getfloat("learning_decay_rate")
-        self.learning_decay_steps = config.getint("learning_decay_steps")
-        self.l2_reg_lambda = config.getfloat("l2_reg_lambda", 0.0)              # L2正则化的系数，主要对全连接层的参数正则化
-        self.max_grad_norm = config.getfloat("max_grad_norm", 5.0)         # 梯度阶段临界值
-        self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
-        self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
-        self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
-        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
-        self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
-        self.model_name = config.get("model_name", "textrcnn")              # 模型名称
-
+    def __init__(self, config_file, section):
+        super(Config, self).__init__(config_file, section=section)
+        self.hidden_sizes = eval(self.config.get("hidden_sizes", "[256,256]"))  # lstm的隐层大小，列表对象，支持多层lstm，只要在列表中添加相应的层对应的隐层大小
 
 
 
@@ -185,8 +147,8 @@ class RCNN(BaseModel):
             word_size = self.config.hidden_sizes[-1] * 2 + self.config.embedding_dim
 
         with tf.name_scope("text_representation"):
-            text_w = tf.Variable(tf.random_uniform([word_size, self.config.output_size], -1.0, 1.0), name="text_w")
-            text_b = tf.Variable(tf.constant(0.1, shape=[self.config.output_size]), name="text_b")
+            text_w = tf.Variable(tf.random_uniform([word_size, self.config.hidden_size], -1.0, 1.0), name="text_w")
+            text_b = tf.Variable(tf.constant(0.1, shape=[self.config.hidden_size]), name="text_b")
 
             # tf.einsum可以指定维度的消除运算
             text_representation = tf.tanh(tf.einsum('aij,jk->aik', word_representation, text_w) + text_b)
@@ -210,7 +172,7 @@ class RCNN(BaseModel):
         with tf.name_scope("fully_connection_layer"):
             output_w = tf.get_variable(
                 "output_w",
-                shape=[self.config.output_size, self.config.num_labels],
+                shape=[self.config.hidden_size, self.config.num_labels],
                 initializer=tf.contrib.layers.xavier_initializer())
             output_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_labels]), name="output_b")
             self.logits = tf.nn.xw_plus_b(h_drop, output_w, output_b, name="logits")

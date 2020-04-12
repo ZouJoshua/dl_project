@@ -66,6 +66,12 @@ class Trainer(TrainerBase):
         self.eval_inputs, self.eval_labels = self.load_data("eval")
         self.log.info("*** Eval data size: {} ***".format(len(self.eval_labels)))
         self.log.info("Label numbers: {}".format(len(self.label_list)))
+
+        self.test_inputs, self.test_labels = self.load_data("test")
+        self.log.info("*** Test data size: {} ***".format(len(self.test_labels)))
+
+        self.all_inputs, self.all_labels = self.load_data("all")
+        self.log.info("*** All data size: {} ***".format(len(self.all_labels)))
         # 初始化模型对象
         self.create_model()
 
@@ -130,7 +136,7 @@ class Trainer(TrainerBase):
                 self.log.info("----- Epoch {}/{} -----".format(epoch + 1, self.config.num_epochs))
 
                 for batch in self.data_obj.next_batch(self.train_inputs, self.train_labels,
-                                                            self.config.train_batch_size):
+                                                            self.config.batch_size):
                     summary, global_step, loss, predictions = self.model.train(sess, batch, self.config.dropout_keep_prob)
 
                     train_summary_writer.add_summary(summary, global_step=global_step)
@@ -159,7 +165,7 @@ class Trainer(TrainerBase):
                         eval_precs = []
                         eval_f_betas = []
                         for eval_batch in self.data_obj.next_batch(self.eval_inputs, self.eval_labels,
-                                                                        self.config.eval_batch_size):
+                                                                        self.config.batch_size):
                             eval_summary, eval_step, eval_loss, eval_predictions = self.model.eval(sess, eval_batch)
                             eval_summary_writer.add_summary(eval_summary, global_step=eval_step)
                             eval_summary_writer.flush()
@@ -241,7 +247,11 @@ class Predictor(PredictorBase):
 
     def load_vocab(self):
         # 将词汇-索引映射表加载出来
-        with open(os.path.join(self.config.data_path, "word2index.pkl"), "rb") as f:
+        if os.path.exists(self.config.word2idx_file):
+            word2index_file = self.config.word2idx_file
+        else:
+            word2index_file = os.path.join(self.config.data_path, "word2index.pkl")
+        with open(word2index_file, "rb") as f:
             word_to_index = pickle.load(f)
 
         with open(os.path.join(self.config.data_path, "label2index.pkl"), "rb") as f:
@@ -338,12 +348,12 @@ def train_model(config):
     output = config.output_path
     if not os.path.exists(output):
         os.makedirs(output)
-    log_file = os.path.join(output, '{}_train_log'.format(config.model_name))
+    log_file = os.path.join(output, '{}_train_log_word'.format(config.model_name))
     log = Logger("train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
     log.info(json.dumps(config.all_params, indent=4))
     trainer = Trainer(config, logger=log)
-    trainer.train()
+    # trainer.train()
 
 
 def predict_to_file(config):
@@ -470,7 +480,7 @@ def main():
     model_name = <"textcnn", "textrcnn", "char_cnn", "textrnn", "bilstm", "bilstm_attention", "transformer", "fasttext">
     :return:
     """
-    config = get_model_config(model_name="textrnn")
+    config = get_model_config(model_name="textcnn")
     train_model(config)
     # predict_to_file(config)
 

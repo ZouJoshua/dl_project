@@ -11,11 +11,13 @@
 
 import os
 import json
-import pickle
+import pickle as pkl
 from collections import Counter
+from string import punctuation
 from sklearn.utils import shuffle
 import tqdm
 import gensim
+import jieba
 import numpy as np
 import logging
 
@@ -37,19 +39,25 @@ class DatasetLoader(DataBase):
             logging.root.setLevel(level=logging.INFO)
 
         self._data_path = config.data_path
-        self._label2idx_path = config.label2idx_path
+        self._label2idx_path = config.label2idx_file
         self.embedding_dim = config.embedding_dim
         self.sequence_length = config.sequence_length
-        self._pretrain_embedding_path = config.pretrain_embedding
+        self._pretrain_embedding_file = config.pretrain_embedding_file
         self.vocab_size = config.vocab_size
+        self.word_cut = True
         self.word_embedding = None
         self.word2index = None
         self.label2index = None
-        self.word2idx_pkl_file = os.path.join(self._data_path, "word2index.pkl")
-        self.label2idx_pkl_file = os.path.join(self._data_path, "label2index.pkl")
-        self.word_embedding_path = os.path.join(self._data_path, "word_embedding.npy")
-        self.init_vocab()
+        if self.word_cut:
+            self.word2idx_pkl_file = os.path.join(self._data_path, "word2index.pkl")
+            self.embedding_file = os.path.join(self._data_path, "word_embedding.npy")
+        else:
+            self.word2idx_pkl_file = os.path.join(self._data_path, "char2index.pkl")
+            self.embedding_file = os.path.join(self._data_path, "char_embedding.npy")
 
+        self.label2idx_pkl_file = os.path.join(self._data_path, "label2index.pkl")
+
+        self.init_vocab()
 
 
     def read_data(self, file, mode=""):
@@ -57,7 +65,7 @@ class DatasetLoader(DataBase):
         读取数据
         :return: 返回分词后的文本内容和标签，inputs = [[]], labels = []
         """
-        self.log.info("*** Read data from file:{}".format(file))
+        self.log.info("Read data from file:{}".format(file))
         inputs = []
         labels = []
         with open(file, "r", encoding="utf-8") as f:
@@ -93,10 +101,14 @@ class DatasetLoader(DataBase):
         """
         # all_words = [word for data in inputs for word in data]
         # word_count = Counter(all_words)  # 统计词频
-        self.log.info("*** Removing low frequency words and stop words")
+        self.log.info("Removing low frequency words and stop words")
         word_count = dict()
         for data in inputs:
-            for word in data:
+            if self.word_cut:
+                word_list = self.split_sentence_by_jieba(data)
+            else:
+                word_list = self.split_sentence_by_char(data)
+            for word in word_list:
                 if word in word_count:
                     word_count[word] += 1
                 else:
@@ -116,18 +128,94 @@ class DatasetLoader(DataBase):
 
         return words
 
+    def split_sentence_by_char(self, text):
+        """
+        按字切分句子,去除非中文字符及标点
+        :param text:
+        :return:
+        """
+        # print("splitting chinese char")
+        seg_list = list()
+        none_chinese = ""
+        for char in text:
+            if self.is_chinese(char) is False:
+                if char in self.punc_list:
+                    continue
+                none_chinese += char
+            else:
+                if none_chinese:
+                    seg_list.append(none_chinese)
+                    none_chinese = ""
+                seg_list.append(char)
+        if not seg_list:
+            seg_list = None
+        return seg_list
+
+    def split_sentence_by_jieba(self, text):
+        """
+        按结巴分词.去除标点
+        :param text:
+        :return:
+        """
+        seg_list = jieba.cut(text, cut_all=False)
+        words = [w for w in seg_list if w not in self.punc_list]
+        if not words:
+            words = None
+
+        return words
+
+    def is_chinese(self, uchar):
+        """判断一个unicode是否是汉字"""
+        if (uchar >= u'\u4e00') and (uchar <= u'\u9fa5'):
+            return True
+        else:
+            return False
+
+    @property
+    def punc_list(self):
+        add_punc = '，。、【 】 “”：；（）《》‘’{}？！⑦()、%^>℃：”“^-——=&#@￥\n「」…『』\u3000'
+        return punctuation + add_punc
+
+
+    def get_embedding(self):
+        """
+        提取预训练词向量
+        :return:
+        """
+        self.log.info("Load embedding from pre-training file: {}".format(self._pretrain_embedding_file))
+        word_embedding = (1 / np.sqrt(self.vocab_size) * (2 * np.random.rand(self.vocab_size, self.embedding_dim) - 1))
+
+        # word_embedding = np.random.rand(self.vocab_size, self.config.embedding_dim)
+        f = open(self._pretrain_embedding_file, "r", encoding='UTF-8')
+        for i, line in enumerate(f.readlines()):
+            if i == 0:  # 若第一行是标题，则跳过
+                continue
+            lin = line.strip().split(" ")
+            if lin[0] in self.word2index:
+                idx = self.word2index[lin[0]]
+                emb = [float(x) for x in lin[1:self.config.embedding_dim+1]]
+                word_embedding[idx] = np.asarray(emb, dtype='float32')
+        f.close()
+        # 将本项目的词向量保存起来
+        np.save(self.embedding_file, word_embedding)
+        # np.savez_compressed(self.word_embedding_file, embeddings=word_embedding)
+        self.log.info("Load finished")
+        return word_embedding
+
+
+
     def get_word_embedding(self, vocab):
         """
         加载词向量，并获得相应的词向量矩阵
         :param vocab: 训练集所含有的单词
         :return:
         """
-        self.log.info("*** Load embedding from pre-training file: {}".format(self._pretrain_embedding_path))
+        self.log.info("Load embedding from pre-training file: {}".format(self._pretrain_embedding_file))
         word_embedding = (1 / np.sqrt(len(vocab)) * (2 * np.random.rand(len(vocab), self.embedding_dim) - 1))
-        if os.path.splitext(self._pretrain_embedding_path)[-1] == ".bin":
-            word_vec = gensim.models.KeyedVectors.load_word2vec_format(self._pretrain_embedding_path, binary=True)
+        if os.path.splitext(self._pretrain_embedding_file)[-1] == ".bin":
+            word_vec = gensim.models.KeyedVectors.load_word2vec_format(self._pretrain_embedding_file, binary=True)
         else:
-            word_vec = gensim.models.KeyedVectors.load_word2vec_format(self._pretrain_embedding_path)
+            word_vec = gensim.models.KeyedVectors.load_word2vec_format(self._pretrain_embedding_file)
 
         for i in range(len(vocab)):
             try:
@@ -135,11 +223,18 @@ class DatasetLoader(DataBase):
                 word_embedding[i, :] = vector
             except:
                 self.log.warning(vocab[i] + "不存在于字向量中")
+        # 将本项目的词向量保存起来
+        np.save(self.embedding_file, word_embedding)
         self.log.info("Load finished")
         return word_embedding
 
-    def init_vocab(self):
 
+    def init_vocab(self):
+        """
+        构建词表,标签映射(我以新闻全量数据构建)
+        :return:
+        """
+        self.log.info("*** Init vocab and label ***")
         if os.path.exists(self.word2idx_pkl_file) and \
                 os.path.exists(self.label2idx_pkl_file):
             self.word2index, self.label2index = self.load_vocab()
@@ -154,11 +249,14 @@ class DatasetLoader(DataBase):
             # 3，得到词汇表
             self.word2index, self.label2index = self.gen_vocab(words, labels)
 
-        if os.path.exists(self.word_embedding_path):
-            self.log.info("Load word embedding from file: {}".format(self.word_embedding_path))
-            self.word_embedding = np.load(self.word_embedding_path)
-        elif os.path.exists(self._pretrain_embedding_path):
-            self.word_embedding = self.get_word_embedding()
+        if os.path.exists(self.embedding_file):
+            self.log.info("Load word embedding from file: {}".format(self.embedding_file))
+            self.word_embedding = np.load(self.embedding_file)
+        elif os.path.exists(self._pretrain_embedding_file):
+            self.word_embedding = self.get_embedding()
+            # self.word_embedding = self.get_word_embedding(words)
+
+        self.log.info("*** Init finished ***")
 
 
     def gen_vocab(self, words, labels):
@@ -177,23 +275,21 @@ class DatasetLoader(DataBase):
         # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
         self.vocab_size = len(vocab)
 
-        if self._pretrain_embedding_path:
-            word_embedding = self.get_word_embedding(vocab)
-            # 将本项目的词向量保存起来
-            np.save(self.word_embedding_path, word_embedding)
+        # if self._pretrain_embedding_file:
+        #     word_embedding = self.get_word_embedding(vocab)
 
         word2index = dict(zip(vocab, list(range(len(vocab)))))
+        # word2index = {word: idx for idx, word in enumerate(vocab)}
 
         # 将词汇-索引映射表保存为pkl数据，之后做inference时直接加载来处理数据
-        with open(self.word2idx_pkl_file, "wb") as f:
-            pickle.dump(word2index, f)
+        pkl.dump(word2index, open(self.word2idx_pkl_file, "wb"))
 
         # 将标签-索引映射表保存为pkl数据
         # unique_labels = list(set(labels))
         # label2index = dict(zip(unique_labels, list(range(len(unique_labels)))))
         label2index = self.get_label_to_index()
-        with open(self.label2idx_pkl_file, "wb") as f:
-            pickle.dump(label2index, f)
+        pkl.dump(label2index, open(self.label2idx_pkl_file, "wb"))
+
         self.log.info("Vocab process finished")
 
         return word2index, label2index
@@ -208,12 +304,12 @@ class DatasetLoader(DataBase):
         # 将词汇-索引映射表加载出来
         self.log.info("Load word2index from file: {}".format(self.word2idx_pkl_file))
         with open(self.word2idx_pkl_file, "rb") as f:
-            word2index = pickle.load(f)
+            word2index = pkl.load(f)
 
         # 将标签-索引映射表加载出来
         self.log.info("Load label2index from file: {}".format(self.label2idx_pkl_file))
         with open(self.label2idx_pkl_file, "rb") as f:
-            label2index = pickle.load(f)
+            label2index = pkl.load(f)
 
         self.vocab_size = len(word2index)
 
@@ -268,11 +364,35 @@ class DatasetLoader(DataBase):
 
 
     def convert_examples_to_features(self, file_path, pkl_file, mode):
-
+        self.log.info("*** Build {} dataset ***".format(mode))
         if not os.path.exists(pkl_file):
-            self.log.info("*** Loading {} dataset from original file ***".format(mode))
-            # 1.读取原始数据
-            inputs, labels = self.read_data(file_path, mode)
+
+            if self.word_cut:
+                _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.word.{}.txt".format(mode))
+            else:
+                _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.char.{}.txt".format(mode))
+
+            if os.path.exists(_clean_data_file):
+                self.log.info("Loading {} dataset from clean data file".format(mode))
+                inputs, labels = self.read_data(_clean_data_file, mode)
+            else:
+                self.log.info("Loading {} dataset from original data file".format(mode))
+                # 1.读取原始数据
+                inputs, labels = self.read_data(file_path, mode)
+                f = open(_clean_data_file, "w", encoding="utf-8")
+
+                for text, label in zip(inputs, labels):
+                    line = dict()
+                    if self.word_cut:
+                        word_list = self.split_sentence_by_jieba(text)
+                    else:
+                        word_list = self.split_sentence_by_char(text)
+                    if word_list:
+                        line["text"] = word_list
+                        line["label"] = label
+                        f.write(json.dumps(line, ensure_ascii=False) + "\n")
+                        f.flush()
+                f.close()
 
             # 2.输入转索引
             inputs_idx = self.trans_to_index(inputs, self.word2index)
@@ -288,14 +408,17 @@ class DatasetLoader(DataBase):
 
             corpus_data = dict(inputs_idx=inputs_idx, labels_idx=labels_idx)
             with open(pkl_file, "wb") as fw:
-                pickle.dump(corpus_data, fw)
+                pkl.dump(corpus_data, fw)
 
-            return np.array(inputs_idx), np.array(labels_idx)
         else:
             self.log.info("Load existed {} data from pkl file: {}".format(mode, pkl_file))
             with open(pkl_file, "rb") as f:
-                corpus_data = pickle.load(f)
-            return np.array(corpus_data["inputs_idx"]), np.array(corpus_data["labels_idx"])
+                corpus_data = pkl.load(f)
+                inputs_idx = corpus_data["inputs_idx"]
+                labels_idx = corpus_data["labels_idx"]
+
+        self.log.info("*** Build finished ***")
+        return np.array(inputs_idx), np.array(labels_idx)
 
 
 

@@ -12,57 +12,24 @@
 import tensorflow as tf
 from model_tensorflow.basic_model import BaseModel
 from math import sqrt
-import configparser
+from model_tensorflow.basic_config import ConfigBase
 
 
-class Config(object):
-    """Char_CNN配置参数"""
-    def __init__(self, config_file, section=None):
-        config_ = configparser.ConfigParser()
-        config_.read(config_file)
-        if not config_.has_section(section):
-            raise Exception("Section={} not found".format(section))
+class Config(ConfigBase):
+    """charcnn配置参数"""
+    def __init__(self, config_file, section):
+        super(Config, self).__init__(config_file, section=section)
 
-        self.all_params = {}
-        for i in config_.items(section):
-            self.all_params[i[0]] = i[1]
-
-        config = config_[section]
-        if not config:
-            raise Exception("Config file error.")
-        self.data_path = config.get("data_path")                           # 数据目录
-        self.label2idx_path = config.get("label2idx_path")                 # label映射文件
-        self.pretrain_embedding = config.get("pretrain_embedding")         # 预训练词向量文件
-        self.stopwords_path = config.get("stopwords_path", "")             # 停用词文件
-        self.output_path = config.get("output_path")                       # 输出目录(模型文件\)
-        self.ckpt_model_path = config.get("ckpt_model_path", "")           # 模型目录
-        self.sequence_length = config.getint("sequence_length")            # 序列长度
-        self.num_labels = config.getint("num_labels")                      # 类别数,二分类时置为1,多分类时置为实际类别数
-        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
-        self.vocab_size = config.getint("vocab_size")                      # 字典大小
-        self.large_params = config.getboolean("large_params", False)       # char_cnn模型是否使用大参数
-        self.conv_layers_size = eval(config.get("conv_layers_size", "[[256, 7, 3],\
+        self.is_training = self.config.getboolean("is_training", False)                     # 是否训练
+        self.large_params = self.config.getboolean("large_params", False)                   # char_cnn模型是否使用大参数
+        self.conv_layers_size = eval(self.config.get("conv_layers_size", "[[256, 7, 3],\
                                                                         [256, 7, 3],\
                                                                         [256, 3, None],\
                                                                         [256, 3, None],\
                                                                         [256, 3, None],\
-                                                                        [256, 3, 3]]"))    # 卷积层尺寸, a list of int. e.g.
-        self.fc_layers_size = eval(config.get("fc_layers_size", "[1024,1024,1024]"))   # 全连接层神经元尺寸, a list of int
-        self.output_size = config.getint("output_size", 256)               # 输出层神经元,如果有设置全连接层,可不设置输出层神经元
-        self.is_training = config.getboolean("is_training", False)
-        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
-        self.optimization = config.get("optimization", "adam")             # 优化算法
-        self.learning_rate = config.getfloat("learning_rate")              # 学习速率
-        self.learning_decay_rate = config.getfloat("learning_decay_rate")
-        self.learning_decay_steps = config.getint("learning_decay_steps")
-        self.l2_reg_lambda = config.getfloat("l2_reg_lambda", 0.0)              # L2正则化的系数，主要对全连接层的参数正则化
-        self.max_grad_norm = config.getfloat("max_grad_norm", 5.0)         # 梯度阶段临界值
-        self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
-        self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
-        self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
-        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
-        self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
-        self.model_name = config.get("model_name", "char_cnn")              # 模型名称
+                                                                        [256, 3, 3]]"))     # 卷积层尺寸, a list of int. e.g.
+        self.fc_layers_size = eval(self.config.get("fc_layers_size", "[1024,1024,1024]"))   # 全连接层神经元尺寸, a list of int
+
 
 
 
@@ -157,10 +124,10 @@ class CharCNN(BaseModel):
                                 [conv_num_filter, 3, None],
                                 [conv_num_filter, 3, None],
                                 [conv_num_filter, 3, 3]]
-            if not self.config.output_size:
+            if not self.config.hidden_size:
                 output_size = fc_num_filter
             else:
-                output_size = self.config.output_size
+                output_size = self.config.hidden_size
 
             self.fc_layers_size = [fc_num_filter, fc_num_filter, output_size]
         else:

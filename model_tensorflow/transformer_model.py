@@ -11,52 +11,18 @@
 import tensorflow as tf
 import numpy as np
 from model_tensorflow.basic_model import BaseModel
-import configparser
+from model_tensorflow.basic_config import ConfigBase
 
 
-class Config(object):
+
+class Config(ConfigBase):
     """Transformer配置参数"""
-    def __init__(self, config_file, section=None):
-        config_ = configparser.ConfigParser()
-        config_.read(config_file)
-        if not config_.has_section(section):
-            raise Exception("Section={} not found".format(section))
-
-        self.all_params = {}
-        for i in config_.items(section):
-            self.all_params[i[0]] = i[1]
-
-        config = config_[section]
-        if not config:
-            raise Exception("Config file error.")
-        self.data_path = config.get("data_path")                           # 数据目录
-        self.label2idx_path = config.get("label2idx_path")                 # label映射文件
-        self.pretrain_embedding = config.get("pretrain_embedding")         # 预训练词向量文件
-        self.stopwords_path = config.get("stopwords_path", "")             # 停用词文件
-        self.output_path = config.get("output_path")                       # 输出目录(模型文件\)
-        self.ckpt_model_path = config.get("ckpt_model_path", "")           # 模型目录
-        self.sequence_length = config.getint("sequence_length")            # 序列长度
-        self.num_labels = config.getint("num_labels")                      # 类别数,二分类时置为1,多分类时置为实际类别数
-        self.embedding_dim = config.getint("embedding_dim")                # 词向量维度
-        self.vocab_size = config.getint("vocab_size")                      # 字典大小
-        self.is_training = config.getboolean("is_training", False)         # 模型是否是训练过程
-        self.filters = config.getint("filters", 128)                       # feed forward是用卷积实现的，这里为第一层卷积层的卷积核数量，第二层的卷积核数量要等于embedding size，在这里也可以用全连接层
-        self.num_blocks = config.getint("num_blocks", 1)                   # encoder块的数量，类似于卷积的层数
-        self.num_heads = config.getint("num_heads", 3)                     # self attention 的头数
-        self.ln_epsilon = config.getfloat("ln_epsilon", 1e-8)              # layer norm中的除法中引入的极小数值
-        self.dropout_keep_prob = config.getfloat("dropout_keep_prob")      # 保留神经元的比例
-        self.optimization = config.get("optimization", "adam")             # 优化算法
-        self.learning_rate = config.getfloat("learning_rate")              # 学习速率
-        self.learning_decay_rate = config.getfloat("learning_decay_rate")
-        self.learning_decay_steps = config.getint("learning_decay_steps")
-        self.l2_reg_lambda = config.getfloat("l2_reg_lambda", 0.0)              # L2正则化的系数，主要对全连接层的参数正则化
-        self.max_grad_norm = config.getfloat("max_grad_norm", 5.0)         # 梯度阶段临界值
-        self.num_epochs = config.getint("num_epochs")                      # 全样本迭代次数
-        self.train_batch_size = config.getint("train_batch_size")          # 训练集批样本大小
-        self.eval_batch_size = config.getint("eval_batch_size")            # 验证集批样本大小
-        self.test_batch_size = config.getint("test_batch_size")            # 测试集批样本大小
-        self.eval_every_step = config.getint("eval_every_step")            # 迭代多少步验证一次模型
-        self.model_name = config.get("model_name", "transformer")              # 模型名称
+    def __init__(self, config_file, section):
+        super(Config, self).__init__(config_file, section=section)
+        self.filters = self.config.getint("filters", 128)  # feed forward是用卷积实现的，这里为第一层卷积层的卷积核数量，第二层的卷积核数量要等于embedding size，在这里也可以用全连接层
+        self.num_blocks = self.config.getint("num_blocks", 1)  # encoder块的数量，类似于卷积的层数
+        self.num_heads = self.config.getint("num_heads", 3)  # self attention 的头数
+        self.ln_epsilon = self.config.getfloat("ln_epsilon", 1e-8)  # layer norm中的除法中引入的极小数值
 
 
 
@@ -101,11 +67,7 @@ class Transformer(BaseModel):
                 embedded_words = tf.nn.embedding_lookup(embedding_w, self.inputs)
 
             with tf.name_scope("position-embedding"):
-                if self.config.is_training:
-                    batch_size = self.config.train_batch_size
-                else:
-                    batch_size = self.config.eval_batch_size
-                embedded_position = self._position_embedding(batch_size)
+                embedded_position = self._position_embedding(self.config.batch_size)
 
             self.embedded_representation = embedded_words + embedded_position
 
