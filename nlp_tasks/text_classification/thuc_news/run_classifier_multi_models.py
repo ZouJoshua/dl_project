@@ -27,7 +27,8 @@ from model_tensorflow.bilstm_model import BiLstm
 from model_tensorflow.bilstm_attention_model import BiLstmAttention
 from model_tensorflow.transformer_model import Transformer
 from model_tensorflow.fasttext_model import Fasttext
-from evaluate.metrics import get_binary_metrics, get_multi_metrics, mean, get_custom_multi_metrics
+from evaluate.custom_metrics import get_binary_metrics, get_multi_metrics, mean, get_custom_multi_metrics
+from sklearn.metrics import classification_report, confusion_matrix
 
 import logging
 from utils.logger import Logger
@@ -55,7 +56,8 @@ class Trainer(TrainerBase):
         self.data_obj = DatasetLoader(config, logger=self.log)
         self.label2index = self.data_obj.label2index
         self.word_embedding = self.data_obj.word_embedding
-        self.label_list = [value for key, value in self.label2index.items()]
+        # self.label_list = [value for key, value in self.label2index.items()]
+        self.label_list = [kv[0] for kv in sorted(self.label2index.items(), key=lambda item: item[1])]
 
         self.vocab_size = self.data_obj.vocab_size
         self.log.info("*** Vocab size: {} ***".format(self.vocab_size))
@@ -118,6 +120,11 @@ class Trainer(TrainerBase):
             # 初始化变量值
             sess.run(tf.global_variables_initializer())
 
+            total_batch = 0  # 记录进行到多少batch
+            dev_best_loss = float('inf')
+            last_improve = 0  # 记录上次验证集loss下降的batch数
+            flag = False  # 记录是否很久没有效果提升
+
             # 创建train和eval的summary路径和写入对象
             train_summary_path = os.path.join(self.config.output_path, "summary", "train")
             if not os.path.exists(train_summary_path):
@@ -134,6 +141,7 @@ class Trainer(TrainerBase):
 
                 for batch in self.data_obj.next_batch(self.train_inputs, self.train_labels,
                                                             self.config.batch_size):
+
                     summary, global_step, loss, predictions = self.model.train(sess, batch, self.config.dropout_keep_prob)
 
                     train_summary_writer.add_summary(summary, global_step=global_step)
@@ -141,54 +149,27 @@ class Trainer(TrainerBase):
 
                     if self.config.num_labels == 1:
                         acc, auc, recall, prec, f_beta = get_binary_metrics(pred_y=predictions, true_y=batch["y"])
-                        self.log.info("train-step: {}, loss: {}, acc: {}, auc: {}, recall: {}, precision: {}, f_beta: {}".format(
-                            global_step, loss, acc, auc, recall, prec, f_beta))
+                        msg = "train-step: {0:>6}, loss:{1:>5.2}, acc:{2:>6.2%}, auc:{3:>6.2%}, recall:{4:>6.2%}, precision:{5:>6.2%}, f_beta:{6:>6.2%}"
+                        self.log.info(msg.format(global_step, loss, acc, auc, recall, prec, f_beta))
                     elif self.config.num_labels > 1:
-                        acc, recall, prec, f_beta = get_custom_multi_metrics(pred_y=predictions, true_y=batch["y"],
-                                                                      labels=self.label_list)
-                        self.log.info("train-step: {}, loss: {}, acc: {}, recall: {}, precision: {}, f_beta: {}".format(
-                            global_step, loss, acc, recall, prec, f_beta))
+                        # acc, recall, prec, f_beta = get_custom_multi_metrics(pred_y=predictions, true_y=batch["y"],
+                        #                                               labels=self.label_list)
+                        # self.log.info("train-step: {}, loss: {}, acc: {}, recall: {}, precision: {}, f_beta: {}".format(
+                        #     global_step, loss, acc, recall, prec, f_beta))
+                        msg = "train-step: {0:>6}, loss:{1:>5.2}, acc:{2:>6.2%}, recall:{3:>6.2%}, F1_score:{4:>6.2%}"
+                        acc, recall, F1 = get_multi_metrics(pred_y=predictions, true_y=batch["y"])
 
-                        # acc, recall, F1 = get_multi_metrics(pred_y=predictions, true_y=batch["y"])
-                        # self.log.info("train-step: {}, loss: {}, acc: {}, recall: {}, F1_score: {}".format(
-                        #     global_step, loss, acc, recall, F1))
+                        self.log.info(msg.format(global_step, loss, acc, recall, F1))
 
                     if self.data_obj and global_step % self.config.eval_every_step == 0:
+                        dev_loss, dev_acc = self.evaluate(sess, eval_summary_writer)
 
-                        eval_losses = []
-                        eval_accs = []
-                        eval_aucs = []
-                        eval_recalls = []
-                        eval_precs = []
-                        eval_f_betas = []
-                        for eval_batch in self.data_obj.next_batch(self.eval_inputs, self.eval_labels,
-                                                                        self.config.batch_size):
-                            eval_summary, eval_step, eval_loss, eval_predictions = self.model.eval(sess, eval_batch)
-                            eval_summary_writer.add_summary(eval_summary, global_step=eval_step)
-                            eval_summary_writer.flush()
-
-                            eval_losses.append(eval_loss)
-                            if self.config.num_labels == 1:
-                                acc, auc, recall, prec, f_beta = get_binary_metrics(pred_y=eval_predictions,
-                                                                                    true_y=eval_batch["y"])
-                                eval_accs.append(acc)
-                                eval_aucs.append(auc)
-                                eval_recalls.append(recall)
-                                eval_precs.append(prec)
-                                eval_f_betas.append(f_beta)
-                            elif self.config.num_labels > 1:
-                                acc, recall, prec, f_beta = get_custom_multi_metrics(pred_y=eval_predictions,
-                                                                              true_y=eval_batch["y"],
-                                                                              labels=self.label_list)
-                                eval_accs.append(acc)
-                                eval_recalls.append(recall)
-                                eval_precs.append(prec)
-                                eval_f_betas.append(f_beta)
-                        self.log.info("\n")
-                        self.log.info("eval:  loss: {}, acc: {}, auc: {}, recall: {}, precision: {}, f_beta: {}".format(
-                            mean(eval_losses), mean(eval_accs), mean(eval_aucs), mean(eval_recalls),
-                            mean(eval_precs), mean(eval_f_betas)))
-                        self.log.info("\n")
+                        if dev_loss < dev_best_loss:
+                            dev_best_loss = dev_loss
+                            improve = '*'
+                            last_improve = global_step
+                        else:
+                            improve = ''
 
                         if self.config.ckpt_model_path:
                             ckpt_model_path = self.config.ckpt_model_path
@@ -199,6 +180,16 @@ class Trainer(TrainerBase):
                             os.makedirs(ckpt_model_path)
                         model_save_path = os.path.join(ckpt_model_path, self.config.model_name)
                         self.model.saver.save(sess, model_save_path, global_step=global_step)
+
+                        if total_batch - last_improve > self.config.require_improvement:
+                            # 验证集loss超过10个batch没下降，结束训练
+                            self.log.info("No optimization for a long time, auto-stopping...")
+                            flag = True
+                            break
+                if flag:
+                    break
+
+
 
             # inputs = {"inputs": tf.saved_model.utils.build_tensor_info(self.model.inputs),
             #           "keep_prob": tf.saved_model.utils.build_tensor_info(self.model.keep_prob)}
@@ -215,6 +206,63 @@ class Trainer(TrainerBase):
             #                                           legacy_init_op=legacy_init_op)
             #
             # self.builder.save()
+
+
+    def evaluate(self, sess, summary_writer, test=False):
+        loss_list = []
+        acc_list = []
+        auc_list = []
+        recall_list = []
+        prec_list = []
+        f1_list = []
+        labels_all = []
+        predict_all = []
+        for batch_data in self.data_obj.next_batch(self.eval_inputs, self.eval_labels,
+                                                   self.config.batch_size):
+            summary, step, loss, predictions = self.model.eval(sess, batch_data)
+            summary_writer.add_summary(summary, global_step=step)
+            summary_writer.flush()
+
+            loss_list.append(loss)
+            labels_all.append(batch_data["y"])
+            predict_all.append(predictions)
+
+            if self.config.num_labels == 1:
+                acc, auc, recall, prec, f_beta = get_binary_metrics(pred_y=predictions,
+                                                                    true_y=batch_data["y"])
+                acc_list.append(acc)
+                auc_list.append(auc)
+                recall_list.append(recall)
+                prec_list.append(prec)
+                f1_list.append(f_beta)
+
+            elif self.config.num_labels > 1:
+                # acc, recall, prec, f_beta = get_custom_multi_metrics(pred_y=eval_predictions,
+                #                                                      true_y=eval_batch["y"],
+                #                                                      labels=self.label_list)
+                acc, recall, F1 = get_multi_metrics(pred_y=predictions, true_y=batch_data["y"])
+                acc_list.append(acc)
+                recall_list.append(recall)
+                f1_list.append(F1)
+
+        if self.config.num_labels == 1:
+            msg = "\neval_step loss:{0:>5.2}, acc:{1:>6.2%}, auc:{2:>6.2%}, recall:{3:>6.2%}, precision:{4:>6.2%}, f_beta:{5:>6.2%}"
+            self.log.info(msg.format(mean(loss_list), mean(acc_list), mean(auc_list), mean(recall_list), mean(prec_list), mean(f1_list)))
+        elif self.config.num_labels > 1:
+            msg = "\neval_step loss:{0:>5.2}, acc:{1:>6.2%}, recall:{2:>6.2%}, F1_score:{3:>6.2%}"
+            self.log.info(msg.format(mean(loss_list), mean(acc_list), mean(recall_list), mean(f1_list)))
+
+        if test:
+            report = classification_report(labels_all, predict_all, target_names=self.label_list, digits=4)
+            confusion = confusion_matrix(labels_all, predict_all)
+            self.log.info("classification report...")
+            self.log.info("\n{}".format(report))
+            self.log.info("confusion matrix...")
+            self.log.info("\n{}".format(confusion))
+            return mean(loss_list), mean(acc_list), report, confusion
+        else:
+            return mean(loss_list), mean(acc_list)
+
 
 
 class Predictor(PredictorBase):
@@ -432,7 +480,7 @@ def predict_report(file, log):
     :return:
     """
     from sklearn.metrics import classification_report
-    from evaluate.metrics import get_multi_metrics
+    from evaluate.custom_metrics import get_multi_metrics
     import json
     # file = "/data/work/dl_project/data/corpus/thuc_news/thuc_news.predict.txt"
     result = dict()

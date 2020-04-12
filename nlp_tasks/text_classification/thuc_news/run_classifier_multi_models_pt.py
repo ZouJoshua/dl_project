@@ -397,7 +397,7 @@ def predict_report(file, log):
     :return:
     """
     from sklearn.metrics import classification_report
-    from evaluate.metrics import get_multi_metrics
+    from evaluate.custom_metrics import get_multi_metrics
     import json
     # file = "/data/work/dl_project/data/corpus/thuc_news/thuc_news.predict.txt"
     result = dict()
