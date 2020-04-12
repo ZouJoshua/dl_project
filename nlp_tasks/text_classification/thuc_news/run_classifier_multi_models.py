@@ -120,7 +120,6 @@ class Trainer(TrainerBase):
             # 初始化变量值
             sess.run(tf.global_variables_initializer())
 
-            total_batch = 0  # 记录进行到多少batch
             dev_best_loss = float('inf')
             last_improve = 0  # 记录上次验证集loss下降的batch数
             flag = False  # 记录是否很久没有效果提升
@@ -181,7 +180,7 @@ class Trainer(TrainerBase):
                         model_save_path = os.path.join(ckpt_model_path, self.config.model_name)
                         self.model.saver.save(sess, model_save_path, global_step=global_step)
 
-                        if total_batch - last_improve > self.config.require_improvement:
+                        if global_step - last_improve > self.config.require_improvement:
                             # 验证集loss超过10个batch没下降，结束训练
                             self.log.info("No optimization for a long time, auto-stopping...")
                             flag = True
@@ -393,12 +392,12 @@ def train_model(config):
     output = config.output_path
     if not os.path.exists(output):
         os.makedirs(output)
-    log_file = os.path.join(output, '{}_train_log_word'.format(config.model_name))
-    log = Logger("train_log", log2console=False, log2file=True, logfile=log_file).get_logger()
+    log_file = os.path.join(output, '{}_train_log'.format(config.model_name))
+    log = Logger("train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
     log.info("*** Init all params ***")
     log.info(json.dumps(config.all_params, indent=4))
     trainer = Trainer(config, logger=log)
-    # trainer.train()
+    trainer.train()
 
 
 def predict_to_file(config):

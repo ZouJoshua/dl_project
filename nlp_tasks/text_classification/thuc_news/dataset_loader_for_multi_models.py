@@ -249,11 +249,11 @@ class DatasetLoader(DataBase):
             # 3，得到词汇表
             self.word2index, self.label2index = self.gen_vocab(words, labels)
 
-        if os.path.exists(self.embedding_file):
-            self.log.info("Load word embedding from file: {}".format(self.embedding_file))
-            self.word_embedding = np.load(self.embedding_file)
-        elif os.path.exists(self._pretrain_embedding_file):
-            self.word_embedding = self.get_embedding()
+        # if os.path.exists(self.embedding_file):
+        #     self.log.info("Load word embedding from file: {}".format(self.embedding_file))
+        #     self.word_embedding = np.load(self.embedding_file)
+        # elif os.path.exists(self._pretrain_embedding_file):
+        #     self.word_embedding = self.get_embedding()
             # self.word_embedding = self.get_word_embedding(words)
 
         self.log.info("*** Init finished ***")
