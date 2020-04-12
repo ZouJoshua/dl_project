@@ -83,6 +83,7 @@ class DatasetLoader(DataBase):
                 except:
                     self.log.warning("Error with line {}: {}".format(i, line))
                     continue
+            del lines
         self.log.info("Read finished")
 
         return inputs, labels
@@ -378,10 +379,12 @@ class DatasetLoader(DataBase):
             else:
                 self.log.info("Loading {} dataset from original data file".format(mode))
                 # 1.读取原始数据
-                inputs, labels = self.read_data(file_path, mode)
+                inputs = list()
+                labels = list()
+                sentences, categories = self.read_data(file_path, mode)
                 f = open(_clean_data_file, "w", encoding="utf-8")
 
-                for text, label in zip(inputs, labels):
+                for text, label in zip(sentences, categories):
                     line = dict()
                     if self.word_cut:
                         word_list = self.split_sentence_by_jieba(text)
@@ -390,6 +393,8 @@ class DatasetLoader(DataBase):
                     if word_list:
                         line["text"] = word_list
                         line["label"] = label
+                        inputs.append(word_list)
+                        labels.append(label)
                         f.write(json.dumps(line, ensure_ascii=False) + "\n")
                         f.flush()
                 f.close()
@@ -397,14 +402,17 @@ class DatasetLoader(DataBase):
             # 2.输入转索引
             inputs_idx = self.trans_to_index(inputs, self.word2index)
             self.log.info("Index transform finished")
+            self.log.info("Input example:\n{}".format(inputs_idx[:2]))
 
             # 3.对输入做padding
             inputs_idx = self.padding(inputs_idx, self.sequence_length)
             self.log.info("Padding finished")
+            self.log.info("Padding input example:\n{}".format(inputs_idx[:3]))
 
             # 4.标签转索引
             labels_idx = self.trans_label_to_index(labels, self.label2index)
             self.log.info("Label index transform finished")
+            self.log.info("Label example:\n{}".format(labels_idx[:3]))
 
             corpus_data = dict(inputs_idx=inputs_idx, labels_idx=labels_idx)
             with open(pkl_file, "wb") as fw:
