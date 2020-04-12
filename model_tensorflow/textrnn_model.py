@@ -8,9 +8,10 @@
 """
 
 import tensorflow as tf
-
 from model_tensorflow.basic_model import BaseModel
 from model_tensorflow.basic_config import ConfigBase
+
+
 
 class Config(ConfigBase):
     """textrnn配置参数"""
