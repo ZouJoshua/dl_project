@@ -57,21 +57,18 @@ class Trainer(TrainerBase):
         self.word_embedding = self.data_obj.word_embedding
         self.label_list = [value for key, value in self.label2index.items()]
 
-        self.train_inputs, self.train_labels = self.load_data("train")
-        self.log.info("*** Train data size: {} ***".format(len(self.train_labels)))
         self.vocab_size = self.data_obj.vocab_size
         self.log.info("*** Vocab size: {} ***".format(self.vocab_size))
 
+        self.log.info("*** Label numbers: {} ***".format(len(self.label_list)))
+
+        self.train_inputs, self.train_labels = self.load_data("train")
+        self.log.info("*** Train data size: {} ***".format(len(self.train_labels)))
 
         self.eval_inputs, self.eval_labels = self.load_data("eval")
         self.log.info("*** Eval data size: {} ***".format(len(self.eval_labels)))
-        self.log.info("Label numbers: {}".format(len(self.label_list)))
 
-        self.test_inputs, self.test_labels = self.load_data("test")
-        self.log.info("*** Test data size: {} ***".format(len(self.test_labels)))
 
-        self.all_inputs, self.all_labels = self.load_data("all")
-        self.log.info("*** All data size: {} ***".format(len(self.all_labels)))
         # 初始化模型对象
         self.create_model()
 
