@@ -20,7 +20,6 @@ class Config(ConfigBase):
     def __init__(self, config_file, section):
         super(Config, self).__init__(config_file, section=section)
 
-        self.is_training = self.config.getboolean("is_training", False)                     # 是否训练
         self.large_params = self.config.getboolean("large_params", False)                   # char_cnn模型是否使用大参数
         self.conv_layers_size = eval(self.config.get("conv_layers_size", "[[256, 7, 3],\
                                                                         [256, 7, 3],\

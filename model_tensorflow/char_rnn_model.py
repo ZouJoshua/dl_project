@@ -9,7 +9,6 @@
 """
 
 import tensorflow as tf
-
 from model_tensorflow.basic_model import BaseModel
 from model_tensorflow.basic_config import ConfigBase
 
