@@ -368,6 +368,10 @@ class DatasetLoader(DataBase):
         self.log.info("*** Build {} dataset ***".format(mode))
         if not os.path.exists(pkl_file):
 
+            # 1.读取原始数据
+            inputs = list()
+            labels = list()
+
             if self.word_cut:
                 _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.word.{}.txt".format(mode))
             else:
@@ -375,16 +379,13 @@ class DatasetLoader(DataBase):
 
             if os.path.exists(_clean_data_file):
                 self.log.info("Loading {} dataset from clean data file".format(mode))
-                inputs = []
-                labels = []
+
                 for text, label in self.read_data(_clean_data_file, mode):
                     inputs.append(text)
                     labels.append(label)
             else:
                 self.log.info("Loading {} dataset from original data file".format(mode))
-                # 1.读取原始数据
-                inputs = list()
-                labels = list()
+
                 # sentences, categories = self.read_data(file_path, mode)
                 f = open(_clean_data_file, "w", encoding="utf-8")
 
