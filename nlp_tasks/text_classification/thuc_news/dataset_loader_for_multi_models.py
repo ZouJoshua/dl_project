@@ -66,8 +66,6 @@ class DatasetLoader(DataBase):
         :return: 返回分词后的文本内容和标签，inputs = [[]], labels = []
         """
         self.log.info("Read data from file:{}".format(file))
-        inputs = []
-        labels = []
         with open(file, "r", encoding="utf-8") as f:
             # 将数据集全部加载到内存
             lines = [eval(line) for line in tqdm.tqdm(f, desc="Loading {} dataset".format(mode))]
@@ -78,15 +76,13 @@ class DatasetLoader(DataBase):
             for i, line in enumerate(lines):
                 try:
                     text, label = self._get_text_and_label(line)
-                    inputs.append(text)
-                    labels.append(label)
+                    yield text, label
                 except:
                     self.log.warning("Error with line {}: {}".format(i, line))
                     continue
             del lines
         self.log.info("Read finished")
 
-        return inputs, labels
 
     def _get_text_and_label(self, dict_line):
         # 获取文本和标记
@@ -242,7 +238,11 @@ class DatasetLoader(DataBase):
         else:
             all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
             # 1，读取原始数据
-            inputs, labels = self.read_data(all_data_file, mode="all")
+            inputs = []
+            labels = []
+            for text, label in self.read_data(all_data_file, mode="all"):
+                inputs.append(text)
+                labels.append(label)
 
             # 2，得到去除低频词和停用词的词汇表
             words = self.remove_stop_word(inputs)
@@ -375,16 +375,20 @@ class DatasetLoader(DataBase):
 
             if os.path.exists(_clean_data_file):
                 self.log.info("Loading {} dataset from clean data file".format(mode))
-                inputs, labels = self.read_data(_clean_data_file, mode)
+                inputs = []
+                labels = []
+                for text, label in self.read_data(_clean_data_file, mode):
+                    inputs.append(text)
+                    labels.append(label)
             else:
                 self.log.info("Loading {} dataset from original data file".format(mode))
                 # 1.读取原始数据
                 inputs = list()
                 labels = list()
-                sentences, categories = self.read_data(file_path, mode)
+                # sentences, categories = self.read_data(file_path, mode)
                 f = open(_clean_data_file, "w", encoding="utf-8")
 
-                for text, label in zip(sentences, categories):
+                for text, label in self.read_data(file_path, mode):
                     line = dict()
                     if self.word_cut:
                         word_list = self.split_sentence_by_jieba(text)
