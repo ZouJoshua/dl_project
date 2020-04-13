@@ -103,10 +103,11 @@ class DatasetLoader(DataBase):
         self.log.info("*** Init finished ***")
 
     def build_clean_data(self, data_file, clean_data_file, mode=""):
-        self.log.info("*** Build {} clean dataset ***".format(mode))
+        self.log.info("Build {} clean dataset".format(mode))
         if os.path.exists(clean_data_file):
             self.log.info("Loading {} dataset from clean data file".format(mode))
-            return self.read_data(clean_data_file, mode=mode)
+            for text, label in self.read_data(clean_data_file, mode=mode):
+                yield text, label
         else:
             self.log.info("Loading {} dataset from original data file".format(mode))
 
@@ -126,7 +127,7 @@ class DatasetLoader(DataBase):
                 else:
                     self.log.warning("Split error: {}".format(text))
             f.close()
-        self.log.info("*** Build clean dataset finished ***")
+            self.log.info("Build clean dataset finished")
 
 
     def load_vocab(self):
@@ -163,7 +164,7 @@ class DatasetLoader(DataBase):
 
         # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
         self.vocab_size = len(words)
-        self.log.info("Vocab size: {}".format(self.vocab_size))
+        # self.log.info("Vocab size: {}".format(self.vocab_size))
 
         vocab = words[:self.vocab_size]
 
@@ -199,7 +200,7 @@ class DatasetLoader(DataBase):
         sort_word_count = sorted(inputs.items(), key=lambda x: x[1], reverse=True)
 
         # 去除低频词
-        words = [item[0] for item in sort_word_count]
+        words = [item[0] for item in sort_word_count if item[1] >= 5]
 
         # 如果传入了停用词表，则去除停用词
         if self._stopwords_file:
@@ -353,7 +354,7 @@ class DatasetLoader(DataBase):
         :return:
         """
 
-        inputs_idx = [[word_to_index.get(word, word_to_index["<UNK>"]) for word in sentence] for sentence in inputs]
+        inputs_idx = [word_to_index.get(word, word_to_index["<UNK>"]) for word in inputs]
 
         return inputs_idx
 
@@ -365,8 +366,8 @@ class DatasetLoader(DataBase):
         :param label_to_index: 标签-索引映射表
         :return:
         """
-        labels_idx = [label_to_index[label] for label in labels]
-        return labels_idx
+        # labels_idx = [label_to_index[label] for label in labels]
+        return label_to_index[labels]
 
     def padding(self, inputs, sequence_length):
         """
@@ -375,47 +376,52 @@ class DatasetLoader(DataBase):
         :param sequence_length: 预定义的序列长度
         :return:
         """
-        new_inputs = [sentence[:sequence_length]
-                      if len(sentence) > sequence_length
-                      else sentence + [0] * (sequence_length - len(sentence))
-                      for sentence in inputs]
+        # new_inputs = [sentence[:sequence_length]
+        #               if len(sentence) > sequence_length
+        #               else sentence + [0] * (sequence_length - len(sentence))
+        #               for sentence in inputs]
+        if len(inputs) > sequence_length:
+            inputs = inputs[:sequence_length]
+        else:
+            inputs = inputs + [0] * (sequence_length - len(inputs))
 
-        return new_inputs
+        return inputs
 
 
 
     def convert_examples_to_features(self, file_path, pkl_file, mode):
         self.log.info("*** Build {} dataset ***".format(mode))
         if not os.path.exists(pkl_file):
-
             # 1.读取原始数据
-
             if self.word_cut:
                 _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.word.{}.txt".format(mode))
             else:
                 _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.char.{}.txt".format(mode))
 
-            inputs = list()
-            labels = list()
+            inputs_idx = list()
+            labels_idx = list()
 
+            i = 0
             for word_list, label in self.build_clean_data(file_path, _clean_data_file, mode=mode):
-                inputs.append(word_list)
-                labels.append(label)
+                i += 1
+                # 2.输入转索引
+                input = self.trans_to_index(word_list, self.word2index)
 
-            # 2.输入转索引
-            inputs_idx = self.trans_to_index(inputs, self.word2index)
-            self.log.info("Index transform finished")
-            self.log.info("Input example:\n{}".format(inputs_idx[:2]))
+                # 3.对输入做padding
+                input_id = self.padding(input, self.sequence_length)
 
-            # 3.对输入做padding
-            inputs_idx = self.padding(inputs_idx, self.sequence_length)
-            self.log.info("Padding finished")
-            self.log.info("Padding input example:\n{}".format(inputs_idx[:2]))
+                # 4.标签转索引
+                label_id = self.trans_label_to_index(label, self.label2index)
 
-            # 4.标签转索引
-            labels_idx = self.trans_label_to_index(labels, self.label2index)
-            self.log.info("Label index transform finished")
-            self.log.info("Label example:\n{}".format(labels_idx[:2]))
+                if i < 2:
+                    self.log.info("*** example {} ***".format(i))
+                    self.log.info("Input example: {}".format(word_list))
+                    self.log.info("Input index example: {}".format(input))
+                    self.log.info("Padding input example: {}".format(input_id))
+                    self.log.info("Label example: label:{},label_id:{}".format(label, label_id))
+
+                inputs_idx.append(input_id)
+                labels_idx.append(label_id)
 
             corpus_data = dict(inputs_idx=inputs_idx, labels_idx=labels_idx)
             shuffle(corpus_data)

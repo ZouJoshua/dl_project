@@ -63,7 +63,7 @@ class Trainer(TrainerBase):
         self.log.info("*** Vocab size: {} ***".format(self.vocab_size))
 
         self.log.info("*** Label numbers: {} ***".format(len(self.label_list)))
-        self.log.info("{}".format(self.label_list))
+        self.log.info("Label list:{}".format(self.label_list))
 
         self.train_inputs, self.train_labels = self.load_data("train")
         self.log.info("*** Train data size: {} ***".format(len(self.train_labels)))
