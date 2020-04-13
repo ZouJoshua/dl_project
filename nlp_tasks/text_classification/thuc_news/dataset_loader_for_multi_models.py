@@ -170,7 +170,7 @@ class DatasetLoader(DataBase):
 
     @property
     def punc_list(self):
-        add_punc = '，。、【 】 “”：；（）《》‘’{}？！⑦()、%^>℃：”“^-——=&#@￥\n「」…『』\u3000'
+        add_punc = '，。、【 】 “”：；（）《》‘’{}？！⑦()、%^>℃：”“^-——=&#@￥\n「」…『』\u3000\xa0'
         return punctuation + add_punc
 
 
@@ -267,14 +267,17 @@ class DatasetLoader(DataBase):
         :param labels: 标签
         :return:
         """
-        self.log.info("*** Generate mapping tables for vocabulary, labels, etc.")
+        self.log.info("Generate mapping tables for vocabulary, labels, etc.")
 
         spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]
         words = spec_tokens + words
-        vocab = words[:self.vocab_size]
 
         # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
-        self.vocab_size = len(vocab)
+        self.vocab_size = len(words)
+
+        vocab = words[:self.vocab_size]
+
+
 
         # if self._pretrain_embedding_file:
         #     word_embedding = self.get_word_embedding(vocab)
