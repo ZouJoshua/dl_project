@@ -77,10 +77,18 @@ class DatasetLoader(DataBase):
             else:
                 _clean_data_file = os.path.join(self._data_path, "thuc_news.char.all.txt")
 
-            inputs, labels = self.build_clean_data(all_data_file, _clean_data_file, mode="all")
+            word_count = dict()
+            labels = list()
+            for word_list, label in self.build_clean_data(all_data_file, _clean_data_file, mode="all"):
+                labels.append(label)
+                for word in word_list:
+                    if word in word_count:
+                        word_count[word] += 1
+                    else:
+                        word_count[word] = 1
 
             # 2，得到去除低频词和停用词的词汇表
-            words = self.remove_stop_word(inputs)
+            words = self.remove_stop_word(word_count)
 
             # 3，得到词汇表
             self.word2index, self.label2index = self.gen_vocab(words, labels)
@@ -96,13 +104,9 @@ class DatasetLoader(DataBase):
 
     def build_clean_data(self, data_file, clean_data_file, mode=""):
         self.log.info("*** Build {} clean dataset ***".format(mode))
-        inputs = []
-        labels = []
         if os.path.exists(clean_data_file):
             self.log.info("Loading {} dataset from clean data file".format(mode))
-            for text, label in self.read_data(clean_data_file, mode=mode):
-                inputs.append(text)
-                labels.append(label)
+            return self.read_data(clean_data_file, mode=mode)
         else:
             self.log.info("Loading {} dataset from original data file".format(mode))
 
@@ -116,15 +120,13 @@ class DatasetLoader(DataBase):
                 if word_list:
                     line["text"] = word_list
                     line["label"] = label
-                    inputs.append(word_list)
-                    labels.append(label)
                     f.write(json.dumps(line, ensure_ascii=False) + "\n")
                     f.flush()
+                    yield word_list, label
                 else:
                     self.log.warning("Split error: {}".format(text))
             f.close()
         self.log.info("*** Build clean dataset finished ***")
-        return inputs, labels
 
 
     def load_vocab(self):
@@ -161,6 +163,7 @@ class DatasetLoader(DataBase):
 
         # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
         self.vocab_size = len(words)
+        self.log.info("Vocab size: {}".format(self.vocab_size))
 
         vocab = words[:self.vocab_size]
 
@@ -192,15 +195,8 @@ class DatasetLoader(DataBase):
         # all_words = [word for data in inputs for word in data]
         # word_count = Counter(all_words)  # 统计词频
         self.log.info("Removing low frequency words and stop words")
-        word_count = dict()
-        for word_list in inputs:
-            for word in word_list:
-                if word in word_count:
-                    word_count[word] += 1
-                else:
-                    word_count[word] = 1
 
-        sort_word_count = sorted(word_count.items(), key=lambda x: x[1], reverse=True)
+        sort_word_count = sorted(inputs.items(), key=lambda x: x[1], reverse=True)
 
         # 去除低频词
         words = [item[0] for item in sort_word_count]
@@ -223,19 +219,15 @@ class DatasetLoader(DataBase):
         self.log.info("Read data from file:{}".format(file))
         with open(file, "r", encoding="utf-8") as f:
             # 将数据集全部加载到内存
-            lines = [eval(line) for line in tqdm.tqdm(f, desc="Loading {} dataset".format(mode))]
-            # 打乱顺序
-            lines = shuffle(lines)
-            # 获取数据长度(条数)
-            # corpus_lines = len(lines)
-            for i, line in enumerate(lines):
-                try:
-                    text, label = self._get_text_and_label(line)
-                    yield text, label
-                except:
-                    self.log.warning("Error with line {}: {}".format(i, line))
-                    continue
-            del lines
+            for i, _line in enumerate(tqdm.tqdm(f, desc="Loading {} dataset".format(mode))):
+                if _line:
+                    line = eval(_line)
+                    try:
+                        text, label = self._get_text_and_label(line)
+                        yield text, label
+                    except:
+                        self.log.warning("Error with line {}: {}".format(i, line))
+                        continue
         self.log.info("Read finished")
 
 
@@ -403,8 +395,12 @@ class DatasetLoader(DataBase):
             else:
                 _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.char.{}.txt".format(mode))
 
-            inputs, labels = self.build_clean_data(file_path, _clean_data_file, mode=mode)
+            inputs = list()
+            labels = list()
 
+            for word_list, label in self.build_clean_data(file_path, _clean_data_file, mode=mode):
+                inputs.append(word_list)
+                labels.append(label)
 
             # 2.输入转索引
             inputs_idx = self.trans_to_index(inputs, self.word2index)
@@ -422,6 +418,7 @@ class DatasetLoader(DataBase):
             self.log.info("Label example:\n{}".format(labels_idx[:2]))
 
             corpus_data = dict(inputs_idx=inputs_idx, labels_idx=labels_idx)
+            shuffle(corpus_data)
             with open(pkl_file, "wb") as fw:
                 pkl.dump(corpus_data, fw)
 

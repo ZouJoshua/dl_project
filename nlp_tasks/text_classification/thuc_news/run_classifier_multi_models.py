@@ -71,6 +71,8 @@ class Trainer(TrainerBase):
         self.eval_inputs, self.eval_labels = self.load_data("eval")
         self.log.info("*** Eval data size: {} ***".format(len(self.eval_labels)))
 
+        self.test_inputs, self.test_labels = self.load_data("test")
+        self.log.info("*** Test data size: {} ***".format(len(self.test_labels)))
 
         # 初始化模型对象
         self.create_model()
