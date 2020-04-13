@@ -15,7 +15,7 @@ class ConfigBase(object):
     """基础配置参数"""
     def __init__(self, config_file, section=None):
         config_ = configparser.ConfigParser()
-        config_.read(config_file)
+        config_.read(config_file, encoding="utf-8")
         if not config_.has_section(section):
             raise Exception("Section={} not found".format(section))
 

@@ -43,6 +43,7 @@ class DatasetLoader(DataBase):
         self.embedding_dim = config.embedding_dim
         self.sequence_length = config.sequence_length
         self._pretrain_embedding_file = config.pretrain_embedding_file
+        self._stopwords_file = config.stopwords_file
         self.vocab_size = config.vocab_size
         self.word_cut = True
         self.word_embedding = None
@@ -58,6 +59,160 @@ class DatasetLoader(DataBase):
         self.label2idx_pkl_file = os.path.join(self._data_path, "label2index.pkl")
 
         self.init_vocab()
+
+    def init_vocab(self):
+        """
+        构建词表,标签映射(我以新闻全量数据构建)
+        :return:
+        """
+        self.log.info("*** Init vocab and label ***")
+        if os.path.exists(self.word2idx_pkl_file) and \
+                os.path.exists(self.label2idx_pkl_file):
+            self.word2index, self.label2index = self.load_vocab()
+        else:
+            # 1，读取原始数据
+            all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
+            if self.word_cut:
+                _clean_data_file = os.path.join(self._data_path, "thuc_news.word.all.txt")
+            else:
+                _clean_data_file = os.path.join(self._data_path, "thuc_news.char.all.txt")
+
+            inputs, labels = self.build_clean_data(all_data_file, _clean_data_file, mode="all")
+
+            # 2，得到去除低频词和停用词的词汇表
+            words = self.remove_stop_word(inputs)
+
+            # 3，得到词汇表
+            self.word2index, self.label2index = self.gen_vocab(words, labels)
+
+        # if os.path.exists(self.embedding_file):
+        #     self.log.info("Load word embedding from file: {}".format(self.embedding_file))
+        #     self.word_embedding = np.load(self.embedding_file)
+        # elif os.path.exists(self._pretrain_embedding_file):
+        #     self.word_embedding = self.get_embedding()
+        # self.word_embedding = self.get_word_embedding(words)
+
+        self.log.info("*** Init finished ***")
+
+    def build_clean_data(self, data_file, clean_data_file, mode=""):
+        self.log.info("*** Build {} clean dataset ***".format(mode))
+        inputs = []
+        labels = []
+        if os.path.exists(clean_data_file):
+            self.log.info("Loading {} dataset from clean data file".format(mode))
+            for text, label in self.read_data(clean_data_file, mode=mode):
+                inputs.append(text)
+                labels.append(label)
+        else:
+            self.log.info("Loading {} dataset from original data file".format(mode))
+
+            f = open(clean_data_file, "w", encoding="utf-8")
+            for text, label in self.read_data(data_file, mode=mode):
+                line = dict()
+                if self.word_cut:
+                    word_list = self.split_sentence_by_jieba(text)
+                else:
+                    word_list = self.split_sentence_by_char(text)
+                if word_list:
+                    line["text"] = word_list
+                    line["label"] = label
+                    inputs.append(word_list)
+                    labels.append(label)
+                    f.write(json.dumps(line, ensure_ascii=False) + "\n")
+                    f.flush()
+                else:
+                    self.log.warning("Split error: {}".format(text))
+            f.close()
+        self.log.info("*** Build clean dataset finished ***")
+        return inputs, labels
+
+
+    def load_vocab(self):
+
+        """
+        加载词汇和标签的映射表
+        :return:
+        """
+        # 将词汇-索引映射表加载出来
+        self.log.info("Load word2index from file: {}".format(self.word2idx_pkl_file))
+        with open(self.word2idx_pkl_file, "rb") as f:
+            word2index = pkl.load(f)
+
+        # 将标签-索引映射表加载出来
+        self.log.info("Load label2index from file: {}".format(self.label2idx_pkl_file))
+        with open(self.label2idx_pkl_file, "rb") as f:
+            label2index = pkl.load(f)
+
+        self.vocab_size = len(word2index)
+
+        return word2index, label2index
+
+    def gen_vocab(self, words, labels):
+        """
+        生成词汇，标签等映射表
+        :param words: 训练集所含有的单词
+        :param labels: 标签
+        :return:
+        """
+        self.log.info("Generate mapping tables for vocabulary, labels, etc.")
+
+        spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]
+        words = spec_tokens + words
+
+        # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
+        self.vocab_size = len(words)
+
+        vocab = words[:self.vocab_size]
+
+        # if self._pretrain_embedding_file:
+        #     word_embedding = self.get_word_embedding(vocab)
+
+        word2index = dict(zip(vocab, list(range(len(vocab)))))
+        # word2index = {word: idx for idx, word in enumerate(vocab)}
+
+        # 将词汇-索引映射表保存为pkl数据，之后做inference时直接加载来处理数据
+        pkl.dump(word2index, open(self.word2idx_pkl_file, "wb"))
+
+        # 将标签-索引映射表保存为pkl数据
+        # unique_labels = list(set(labels))
+        # label2index = dict(zip(unique_labels, list(range(len(unique_labels)))))
+        label2index = self.get_label_to_index()
+        pkl.dump(label2index, open(self.label2idx_pkl_file, "wb"))
+
+        self.log.info("Vocab process finished")
+
+        return word2index, label2index
+
+    def remove_stop_word(self, inputs):
+        """
+        去除低频词和停用词
+        :param inputs: 输入
+        :return:
+        """
+        # all_words = [word for data in inputs for word in data]
+        # word_count = Counter(all_words)  # 统计词频
+        self.log.info("Removing low frequency words and stop words")
+        word_count = dict()
+        for word_list in inputs:
+            for word in word_list:
+                if word in word_count:
+                    word_count[word] += 1
+                else:
+                    word_count[word] = 1
+
+        sort_word_count = sorted(word_count.items(), key=lambda x: x[1], reverse=True)
+
+        # 去除低频词
+        words = [item[0] for item in sort_word_count]
+
+        # 如果传入了停用词表，则去除停用词
+        if self._stopwords_file:
+            with open(self._stopwords_file, "r", encoding="utf-8") as fr:
+                stop_words = [line.strip() for line in fr.readlines()]
+            words = [word for word in words if word not in stop_words]
+        self.log.info("Word process finished")
+
+        return words
 
 
     def read_data(self, file, mode=""):
@@ -89,41 +244,6 @@ class DatasetLoader(DataBase):
         text = dict_line["text"]
         label = dict_line["label"]
         return text, label
-
-    def remove_stop_word(self, inputs):
-        """
-        去除低频词和停用词
-        :param inputs: 输入
-        :return:
-        """
-        # all_words = [word for data in inputs for word in data]
-        # word_count = Counter(all_words)  # 统计词频
-        self.log.info("Removing low frequency words and stop words")
-        word_count = dict()
-        for data in inputs:
-            if self.word_cut:
-                word_list = self.split_sentence_by_jieba(data)
-            else:
-                word_list = self.split_sentence_by_char(data)
-            for word in word_list:
-                if word in word_count:
-                    word_count[word] += 1
-                else:
-                    word_count[word] = 1
-
-        sort_word_count = sorted(word_count.items(), key=lambda x: x[1], reverse=True)
-
-        # 去除低频词
-        words = [item[0] for item in sort_word_count]
-
-        # 如果传入了停用词表，则去除停用词
-        if self.config.stopwords_path:
-            with open(self.config.stopwords_path, "r", encoding="utf-8") as fr:
-                stop_words = [line.strip() for line in fr.readlines()]
-            words = [word for word in words if word not in stop_words]
-        self.log.info("Word process finished")
-
-        return words
 
     def split_sentence_by_char(self, text):
         """
@@ -196,9 +316,8 @@ class DatasetLoader(DataBase):
         # 将本项目的词向量保存起来
         np.save(self.embedding_file, word_embedding)
         # np.savez_compressed(self.word_embedding_file, embeddings=word_embedding)
-        self.log.info("Load finished")
+        self.log.info("Load embedding finished")
         return word_embedding
-
 
 
     def get_word_embedding(self, vocab):
@@ -222,102 +341,8 @@ class DatasetLoader(DataBase):
                 self.log.warning(vocab[i] + "不存在于字向量中")
         # 将本项目的词向量保存起来
         np.save(self.embedding_file, word_embedding)
-        self.log.info("Load finished")
+        self.log.info("Load embedding finished")
         return word_embedding
-
-
-    def init_vocab(self):
-        """
-        构建词表,标签映射(我以新闻全量数据构建)
-        :return:
-        """
-        self.log.info("*** Init vocab and label ***")
-        if os.path.exists(self.word2idx_pkl_file) and \
-                os.path.exists(self.label2idx_pkl_file):
-            self.word2index, self.label2index = self.load_vocab()
-        else:
-            all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
-            # 1，读取原始数据
-            inputs = []
-            labels = []
-            for text, label in self.read_data(all_data_file, mode="all"):
-                inputs.append(text)
-                labels.append(label)
-
-            # 2，得到去除低频词和停用词的词汇表
-            words = self.remove_stop_word(inputs)
-
-            # 3，得到词汇表
-            self.word2index, self.label2index = self.gen_vocab(words, labels)
-
-        # if os.path.exists(self.embedding_file):
-        #     self.log.info("Load word embedding from file: {}".format(self.embedding_file))
-        #     self.word_embedding = np.load(self.embedding_file)
-        # elif os.path.exists(self._pretrain_embedding_file):
-        #     self.word_embedding = self.get_embedding()
-            # self.word_embedding = self.get_word_embedding(words)
-
-        self.log.info("*** Init finished ***")
-
-
-    def gen_vocab(self, words, labels):
-        """
-        生成词汇，标签等映射表
-        :param words: 训练集所含有的单词
-        :param labels: 标签
-        :return:
-        """
-        self.log.info("Generate mapping tables for vocabulary, labels, etc.")
-
-        spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]
-        words = spec_tokens + words
-
-        # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
-        self.vocab_size = len(words)
-
-        vocab = words[:self.vocab_size]
-
-
-
-        # if self._pretrain_embedding_file:
-        #     word_embedding = self.get_word_embedding(vocab)
-
-        word2index = dict(zip(vocab, list(range(len(vocab)))))
-        # word2index = {word: idx for idx, word in enumerate(vocab)}
-
-        # 将词汇-索引映射表保存为pkl数据，之后做inference时直接加载来处理数据
-        pkl.dump(word2index, open(self.word2idx_pkl_file, "wb"))
-
-        # 将标签-索引映射表保存为pkl数据
-        # unique_labels = list(set(labels))
-        # label2index = dict(zip(unique_labels, list(range(len(unique_labels)))))
-        label2index = self.get_label_to_index()
-        pkl.dump(label2index, open(self.label2idx_pkl_file, "wb"))
-
-        self.log.info("Vocab process finished")
-
-        return word2index, label2index
-
-
-    def load_vocab(self):
-
-        """
-        加载词汇和标签的映射表
-        :return:
-        """
-        # 将词汇-索引映射表加载出来
-        self.log.info("Load word2index from file: {}".format(self.word2idx_pkl_file))
-        with open(self.word2idx_pkl_file, "rb") as f:
-            word2index = pkl.load(f)
-
-        # 将标签-索引映射表加载出来
-        self.log.info("Load label2index from file: {}".format(self.label2idx_pkl_file))
-        with open(self.label2idx_pkl_file, "rb") as f:
-            label2index = pkl.load(f)
-
-        self.vocab_size = len(word2index)
-
-        return word2index, label2index
 
 
     def get_label_to_index(self):
@@ -372,40 +397,14 @@ class DatasetLoader(DataBase):
         if not os.path.exists(pkl_file):
 
             # 1.读取原始数据
-            inputs = list()
-            labels = list()
 
             if self.word_cut:
                 _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.word.{}.txt".format(mode))
             else:
                 _clean_data_file = os.path.join(os.path.split(file_path)[0], "thuc_news.char.{}.txt".format(mode))
 
-            if os.path.exists(_clean_data_file):
-                self.log.info("Loading {} dataset from clean data file".format(mode))
+            inputs, labels = self.build_clean_data(file_path, _clean_data_file, mode=mode)
 
-                for text, label in self.read_data(_clean_data_file, mode):
-                    inputs.append(text)
-                    labels.append(label)
-            else:
-                self.log.info("Loading {} dataset from original data file".format(mode))
-
-                # sentences, categories = self.read_data(file_path, mode)
-                f = open(_clean_data_file, "w", encoding="utf-8")
-
-                for text, label in self.read_data(file_path, mode):
-                    line = dict()
-                    if self.word_cut:
-                        word_list = self.split_sentence_by_jieba(text)
-                    else:
-                        word_list = self.split_sentence_by_char(text)
-                    if word_list:
-                        line["text"] = word_list
-                        line["label"] = label
-                        inputs.append(word_list)
-                        labels.append(label)
-                        f.write(json.dumps(line, ensure_ascii=False) + "\n")
-                        f.flush()
-                f.close()
 
             # 2.输入转索引
             inputs_idx = self.trans_to_index(inputs, self.word2index)
@@ -415,12 +414,12 @@ class DatasetLoader(DataBase):
             # 3.对输入做padding
             inputs_idx = self.padding(inputs_idx, self.sequence_length)
             self.log.info("Padding finished")
-            self.log.info("Padding input example:\n{}".format(inputs_idx[:3]))
+            self.log.info("Padding input example:\n{}".format(inputs_idx[:2]))
 
             # 4.标签转索引
             labels_idx = self.trans_label_to_index(labels, self.label2index)
             self.log.info("Label index transform finished")
-            self.log.info("Label example:\n{}".format(labels_idx[:3]))
+            self.log.info("Label example:\n{}".format(labels_idx[:2]))
 
             corpus_data = dict(inputs_idx=inputs_idx, labels_idx=labels_idx)
             with open(pkl_file, "wb") as fw:
@@ -433,7 +432,7 @@ class DatasetLoader(DataBase):
                 inputs_idx = corpus_data["inputs_idx"]
                 labels_idx = corpus_data["labels_idx"]
 
-        self.log.info("*** Build finished ***")
+        self.log.info("*** Convert examples to features finished ***")
         return np.array(inputs_idx), np.array(labels_idx)
 
 
