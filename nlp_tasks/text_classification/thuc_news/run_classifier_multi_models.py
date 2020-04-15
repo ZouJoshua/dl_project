@@ -9,8 +9,10 @@
 """
 
 
-import json
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+import json
 import argparse
 import pickle
 from importlib import import_module
@@ -71,8 +73,8 @@ class Trainer(TrainerBase):
         self.eval_inputs, self.eval_labels = self.load_data("eval")
         self.log.info("*** Eval data size: {} ***".format(len(self.eval_labels)))
 
-        self.test_inputs, self.test_labels = self.load_data("test")
-        self.log.info("*** Test data size: {} ***".format(len(self.test_labels)))
+        # self.test_inputs, self.test_labels = self.load_data("test")
+        # self.log.info("*** Test data size: {} ***".format(len(self.test_labels)))
 
         # 初始化模型对象
         self.create_model()
@@ -117,8 +119,10 @@ class Trainer(TrainerBase):
         训练模型
         :return:
         """
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7, allow_growth=True)
-        sess_config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True, gpu_options=gpu_options)
+        # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7, allow_growth=True)
+        # sess_config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True, gpu_options=gpu_options)
+        sess_config = tf.ConfigProto(device_count={"CPU": 4}, log_device_placement=False, allow_soft_placement=True)
+
         with tf.Session(config=sess_config) as sess:
             # 初始化变量值
             sess.run(tf.global_variables_initializer())

@@ -14,7 +14,6 @@ import json
 import pickle as pkl
 from collections import Counter
 from string import punctuation
-from sklearn.utils import shuffle
 import tqdm
 import gensim
 import jieba
@@ -200,7 +199,7 @@ class DatasetLoader(DataBase):
         sort_word_count = sorted(inputs.items(), key=lambda x: x[1], reverse=True)
 
         # 去除低频词
-        words = [item[0] for item in sort_word_count if item[1] >= 5]
+        words = [item[0] for item in sort_word_count if item[1] >= 10]
 
         # 如果传入了停用词表，则去除停用词
         if self._stopwords_file:
@@ -404,6 +403,8 @@ class DatasetLoader(DataBase):
             i = 0
             for word_list, label in self.build_clean_data(file_path, _clean_data_file, mode=mode):
                 i += 1
+                if not word_list:
+                    continue
                 # 2.输入转索引
                 input = self.trans_to_index(word_list, self.word2index)
 
@@ -414,7 +415,7 @@ class DatasetLoader(DataBase):
                 label_id = self.trans_label_to_index(label, self.label2index)
 
                 if i < 2:
-                    self.log.info("*** example {} ***".format(i))
+                    self.log.info("*** {} example {} ***".format(mode, i))
                     self.log.info("Input example: {}".format(word_list))
                     self.log.info("Input index example: {}".format(input))
                     self.log.info("Padding input example: {}".format(input_id))
@@ -424,16 +425,14 @@ class DatasetLoader(DataBase):
                 labels_idx.append(label_id)
 
             corpus_data = dict(inputs_idx=inputs_idx, labels_idx=labels_idx)
-            shuffle(corpus_data)
-            with open(pkl_file, "wb") as fw:
-                pkl.dump(corpus_data, fw)
+            pkl.dump(corpus_data, open(pkl_file, "wb"))
 
         else:
             self.log.info("Load existed {} data from pkl file: {}".format(mode, pkl_file))
-            with open(pkl_file, "rb") as f:
-                corpus_data = pkl.load(f)
-                inputs_idx = corpus_data["inputs_idx"]
-                labels_idx = corpus_data["labels_idx"]
+
+            corpus_data = pkl.load(open(pkl_file, "rb"))
+            inputs_idx = corpus_data["inputs_idx"]
+            labels_idx = corpus_data["labels_idx"]
 
         self.log.info("*** Convert examples to features finished ***")
         return np.array(inputs_idx), np.array(labels_idx)
