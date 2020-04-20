@@ -191,12 +191,9 @@ class TextRNN(BaseModel):
                 for i in range(self.config.num_layers):
                     if dropout_layer:
                         fw_rnn_cell.append(self.dropout_cell())
-                    else:
-                        fw_rnn_cell.append(self.get_rnn_cell())
-                for i in range(self.config.num_layers):
-                    if dropout_layer:
                         bw_rnn_cell.append(self.dropout_cell())
                     else:
+                        fw_rnn_cell.append(self.get_rnn_cell())
                         bw_rnn_cell.append(self.get_rnn_cell())
             else:
                 fw_rnn_cell = self.get_rnn_cell()

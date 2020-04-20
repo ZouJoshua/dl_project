@@ -7,135 +7,201 @@
 @Desc    : 
 
 """
+
 import tensorflow as tf
-import numpy as np
+from model_tensorflow.basic_model import BaseModel
+from model_tensorflow.basic_config import ConfigBase
 
 
-def data_type():
-    return tf.float32
+class Config(ConfigBase):
+    """ner_bilstm_crf配置参数"""
+    def __init__(self, config_file, section):
+        super(Config, self).__init__(config_file, section=section)
+        self.rnn_gate = self.config.get("rnn_gate", "lstm")  # rnn核(rnn,lstm,gru)
+        self.num_layers = self.config.getint("num_layers", 1)  # rnn层数
 
 
-class NERTagger(object):
-    """The NER Tagger Model."""
 
-    def __init__(self, is_training, config):
-        self.batch_size = batch_size = config.batch_size
-        self.num_steps = num_steps = config.num_steps
-        self.is_training = is_training
-        self.crf_layer = config.crf_layer  # if the model has the final CRF decoding layer
-        size = config.hidden_size
-        vocab_size = config.vocab_size
+class NERTagger(BaseModel):
 
-        # Define input and target tensors
-        self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
-        self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
+    def __init__(self, config, vocab_size, word_vectors):
+        super(NERTagger, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
 
+        self.inputs = tf.placeholder(tf.int32, [None, None], name="inputs")  # 数据输入
+        self.labels = tf.placeholder(tf.int32, [None, self.config.sequence_length], name="labels")  # 标签
+        self.sequence_lengths = tf.placeholder(dtype=tf.int32, shape=[None], name='sequence_lengths_vector')
+        # 构建模型
+        self.build_model()
+        # 初始化保存模型的saver对象
+        self.init_saver()
+
+    def build_model(self):
+        self.embedding_layer()
+        self.multi_bi_rnn_layer()
+        self.crf_layer()
+        self.cal_loss()
+
+        self.predictions = self.get_predictions()
+        # 获得训练入口
+        self.train_op, self.summary_op = self.get_train_op()
+
+    def embedding_layer(self):
+        """
+        词嵌入层
+        :return:
+        """
         with tf.device("/cpu:0"):
-            embedding = tf.get_variable("embedding", [vocab_size, size], dtype=data_type())
-            inputs = tf.nn.embedding_lookup(embedding, self._input_data)
+            with tf.name_scope("embedding-layer"):
+                # 利用预训练的词向量初始化词嵌入矩阵
+                if self.word_vectors is not None:
+                    embedding_w = tf.Variable(tf.cast(self.word_vectors, dtype=tf.float32, name="word2vec"),
+                                              name="embedding_w")
+                else:
+                    embedding_w = tf.get_variable("embedding_w", shape=[self.vocab_size, self.config.embedding_dim],
+                                              initializer=tf.contrib.layers.xavier_initializer())
 
-        # BiLSTM CRF model
-        self._cost, self._logits, self._transition_params = self._bilstm_crf_model(inputs, self._targets, config)
+                # 利用词嵌入矩阵将输入的数据中的词转换成词向量，
+                # 维度[batch_size, sequence_length, embedding_dim]
+                self.embedded_words = tf.nn.embedding_lookup(embedding_w, self.inputs)
 
-        # Gradients and SGD update operation for training the model.
-        self._lr = tf.Variable(0.0, trainable=False)
-        tvars = tf.trainable_variables()
-        grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars), config.max_grad_norm)
-        optimizer = tf.train.GradientDescentOptimizer(self._lr)
-        self._train_op = optimizer.apply_gradients(
-            zip(grads, tvars),
-            global_step=tf.contrib.framework.get_or_create_global_step())
+    def multi_rnn_layer(self, static=False):
+        """
+        多层单向rnn网络
+        :param static: 是否用动态计算
+        :return:
+        """
 
-        self._new_lr = tf.placeholder(data_type(), shape=[], name="new_learning_rate")
-        self._lr_update = tf.assign(self._lr, self._new_lr)
-        self.saver = tf.train.Saver(tf.global_variables())
+        rnn_cell = self._hidden_layer()
 
-    def assign_lr(self, session, lr_value):
-        session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
+        if static:
+            # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+            input_x1 = tf.unstack(self.embedded_words, num=self.config.sequence_length, axis=1)
+            hiddens, states = tf.nn.static_rnn(cell=rnn_cell, inputs=input_x1, dtype=tf.float32)
+        else:
+            hiddens, states = tf.nn.dynamic_rnn(cell=rnn_cell, inputs=self.embedded_words, dtype=tf.float32)
+            # 注意这里输出需要转置  转换为时序优先的
+            # hiddens = tf.transpose(hiddens, [1, 0, 2])
+            # self.rnn_output = hiddens[-1]
 
-    @property
-    def input_data(self):
-        return self._input_data
+        self._output_size = self.config.hidden_size
+        self.rnn_output = hiddens[:, -1, :]  # 取最后一个时序输出作为结果
 
-    @property
-    def targets(self):
-        return self._targets
 
-    @property
-    def cost(self):
-        return self._cost
+    def multi_bi_rnn_layer(self, static=False):
+        """
+        多层双向rnn网络（默认bi-lstm）
+        :param static: 是否用动态计算
+        :return:
+        """
+        fw_rnn_cell, bw_rnn_cell = self._hidden_bi_layer()
 
-    @property
-    def logits(self):
-        return self._logits
+        if static:
+            # 静态rnn函数传入的是一个张量list  每一个元素都是一个(batch_size,n_input)大小的张量
+            input_x1 = tf.unstack(self.embedded_words, num=self.config.sequence_length, axis=1)
+            hiddens, fw_state, bw_state = tf.contrib.rnn.stack_bidirectional_rnn(fw_rnn_cell, bw_rnn_cell,
+                                                                                 inputs=input_x1, dtype=tf.float32)
+        else:
+            # 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出也是这种形状
+            # hiddens, fw_state, bw_state = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(fw_rnn_cell, bw_rnn_cell,
+            #                                                                              inputs=self.embedded_words,
+            #                                                                              dtype=tf.float32)
+            hiddens, fw_state, bw_state = tf.nn.bidirectional_dynamic_rnn(fw_rnn_cell, bw_rnn_cell,
+                                                                     self.embedded_words, dtype=tf.float32)
 
-    @property
-    def transition_params(self):  # transition params for CRF layer
-        return self._transition_params
 
-    @property
-    def lr(self):
-        return self._lr
+            # 对outputs中的fw和bw的结果拼接 [batch_size, time_step, hidden_size * 2], 传入到下一层Bi-LSTM中
+            # 按axis=2合并 (?,?,128) (?,?,128)按最后一维合并(?,28,256)
+            hiddens = tf.concat(hiddens, axis=2, name="bi_lstm_concat")
 
-    @property
-    def train_op(self):
-        return self._train_op
+        self.rnn_output = hiddens
+        self.rnn_output_shape = hiddens.get_shape()
 
-    @property
-    def accuracy(self):
-        return self._accuracy
 
-    def _bilstm_crf_model(self, inputs, targets, config):
-        '''
-        @Use BasicLSTMCell, MultiRNNCell method to build LSTM model
-        @Use CRF layer to calculate log likelihood and viterbi decoder to caculate the optimal sequence
-        @return logits, cost and others
-        '''
-        batch_size = config.batch_size
-        num_steps = config.num_steps
-        num_layers = config.num_layers
-        size = config.hidden_size
-        vocab_size = config.vocab_size
-        target_num = config.target_num  # target output number
-        num_features = 2 * size
-
-        # Bi-LSTM NN layer
-        cell_fw = tf.nn.rnn_cell.MultiRNNCell([tf.nn.rnn_cell.BasicLSTMCell(size) for _ in range(num_layers)])
-        cell_bw = tf.nn.rnn_cell.MultiRNNCell([tf.nn.rnn_cell.BasicLSTMCell(size) for _ in range(num_layers)])
-
-        initial_state_fw = cell_fw.zero_state(batch_size, data_type())
-        initial_state_bw = cell_bw.zero_state(batch_size, data_type())
-
-        # Split to get a list of 'n_steps' tensors of shape (batch_size, n_input)
-        inputs_list = [tf.squeeze(s, axis=1) for s in tf.split(value=inputs, num_or_size_splits=num_steps, axis=1)]
-
-        with tf.variable_scope("pos_bilstm_crf"):
-            outputs, state_fw, state_bw = tf.nn.static_bidirectional_rnn(
-                cell_fw, cell_bw, inputs_list, initial_state_fw=initial_state_fw,
-                initial_state_bw=initial_state_bw)
-
-        # outputs is a length T list of output vectors, which is [batch_size, 2 * hidden_size]
-        # [time][batch][cell_fw.output_size + cell_bw.output_size]
-
-        output = tf.reshape(tf.concat(outputs, 1), [-1, num_features])
-        # output has size: batch_size, [T, size * 2]
-        print("LSTM NN layer output size:")
-        print(output.get_shape())
+    def crf_layer(self):
+        # dropout
+        with tf.name_scope("dropout"):
+            h_drop = tf.nn.dropout(self.rnn_output, self.keep_prob)
+        self._output_size = self.config.hidden_size * 2
 
         # Linear-Chain CRF Layer
-        x_crf_input = tf.reshape(output, [batch_size, num_steps, num_features])
-        crf_weights = tf.get_variable("crf_weights", [num_features, target_num], dtype=data_type())
-        matricized_crf_input = tf.reshape(x_crf_input, [-1, num_features])
-        matricized_unary_scores = tf.matmul(matricized_crf_input, crf_weights)
-        unary_scores = tf.reshape(matricized_unary_scores, [batch_size, num_steps, target_num])
+        with tf.name_scope("crf_connection_layer"):
+            crf_input = tf.reshape(h_drop, shape=[-1, self._output_size], name='contact')
+            crf_w = tf.get_variable('crf_weights',
+                                    shape=[self._output_size, self.config.num_labels],
+                                    initializer=tf.contrib.layers.xavier_initializer(),
+                                    dtype=tf.float32, trainable=True)
+            crf_b = tf.get_variable('crf_b', initializer=tf.zeros(shape=[self.config.num_labels]), name="crf_b")
+            p = tf.nn.relu(tf.matmul(crf_input, crf_w) + crf_b)
+            # CRF x input, shape [batch_size, num_steps, label_num]
+            self.logit = tf.reshape(p, shape=[-1, self.rnn_output_shape[1], self.config.num_labels], name='logits')
+            self.l2_loss += tf.nn.l2_loss(crf_w)
+            self.l2_loss += tf.nn.l2_loss(crf_b)
 
-        # log-likelihood
-        sequence_lengths = tf.constant(np.full(batch_size, num_steps - 1, dtype=np.int32))  # shape: [batch_size], value: [T-1, T-1,...]
-        log_likelihood, transition_params = tf.contrib.crf.crf_log_likelihood(unary_scores,
-                                                                              targets, sequence_lengths)
 
-        # Add a training op to tune the parameters.
-        loss = tf.reduce_mean(-log_likelihood)
-        logits = unary_scores  # CRF x input, shape [batch_size, num_steps, target_num]
-        cost = loss
-        return cost, logits, transition_params
+    def get_rnn_cell(self):
+        """
+        自定义返回rnn单元(lstm\rnn\gru)
+        :return:
+        """
+        if self.config.rnn_gate == 'lstm':
+            return tf.nn.rnn_cell.BasicLSTMCell(num_units=self.config.hidden_size, state_is_tuple=True, forget_bias=1.0)
+        elif self.config.rnn_gate == 'gru':
+            return tf.nn.rnn_cell.GRUCell(num_units=self.config.hidden_size)
+        else:
+            return tf.nn.rnn_cell.BasicRNNCell(num_units=self.config.hidden_size)
+
+    def dropout_cell(self):
+        """
+        添加dropout层
+        :return:
+        """
+        return tf.nn.rnn_cell.DropoutWrapper(self.get_rnn_cell(), output_keep_prob=self.keep_prob)
+
+    def _hidden_layer(self, dropout_layer=True):
+
+        with tf.name_scope("{}-layer".format(self.config.rnn_gate)):
+            if self.config.num_layers > 1:
+                cells = list()
+                for i in range(self.config.num_layers):
+                    if dropout_layer:
+                        cells.append(self.dropout_cell())
+                    else:
+                        cells.append(self.get_rnn_cell())
+                rnn_cell = tf.nn.rnn_cell.MultiRNNCell(cells, state_is_tuple=True)
+            else:
+                rnn_cell = self.get_rnn_cell()
+
+        return rnn_cell
+
+    def _hidden_bi_layer(self, dropout_layer=True):
+
+        with tf.name_scope("bi-{}-layer".format(self.config.rnn_gate)):
+
+            if self.config.num_layers > 1:
+                fw_rnn_cell = list()
+                bw_rnn_cell = list()
+                for i in range(self.config.num_layers):
+                    if dropout_layer:
+                        fw_rnn_cell.append(self.dropout_cell())
+                        bw_rnn_cell.append(self.dropout_cell())
+                    else:
+                        fw_rnn_cell.append(self.get_rnn_cell())
+                        bw_rnn_cell.append(self.get_rnn_cell())
+
+            else:
+                fw_rnn_cell = self.get_rnn_cell()
+                bw_rnn_cell = self.get_rnn_cell()
+
+        return fw_rnn_cell, bw_rnn_cell
+
+
+    def cal_loss(self):
+        """
+        计算crf损失
+        :return:
+        """
+        with tf.name_scope("crf_loss"):
+            log_likelihood, self.transition_matrix = tf.contrib.crf.crf_log_likelihood(self.logit, self.labels, sequence_lengths=self.sequence_lengths)
+            loss = -tf.reduce_mean(log_likelihood)
+            self.loss = loss + self.l2_loss
+

@@ -114,8 +114,8 @@ def get_config(conf_dict, name):
       Args: conf_dict:  2Dmap <K,V> K:model_name, V: dict{} hyper_param_key=hyper_param_value
   """
   if (name not in conf_dict):
-    print ("DEBUG: Model Name not in models.conf file... %s" % name)
-    print ("DEBUG: Loading default model config")
+    print("DEBUG: Model Name not in models.conf file... %s" % name)
+    print("DEBUG: Loading default model config")
     config = DefaultModelConfig()
     if _default_model_name in conf_dict:
       default_param = conf_dict[_default_model_name]
