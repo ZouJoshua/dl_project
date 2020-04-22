@@ -12,6 +12,20 @@
 class DataBase(object):
     def __init__(self, config):
         self.config = config
+        self.sepcial_tokens()
+
+    def sepcial_tokens(self):
+        """
+        定义特殊token
+        :return:
+        """
+        self._num_token = "<NUM>"
+        self._en_token = "<ENG>"
+        self._unk_token = "<UNK>"
+        self._pad_token = "<PAD>"
+        self._sep_token = "<SEP>"
+        self._cls_token = "<CLS>"
+        self._mask_token = "<MASK>"
 
     def read_data(self, file, mode=None):
         """
@@ -36,7 +50,7 @@ class DataBase(object):
         """
         raise NotImplementedError
 
-    def gen_vocab(self, words, labels):
+    def gen_vocab(self):
         """
         生成词汇表
         :return:

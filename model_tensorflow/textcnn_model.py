@@ -19,7 +19,7 @@ class Config(ConfigBase):
         super(Config, self).__init__(config_file, section=section)
 
         self.filter_sizes = eval(self.config.get("filter_sizes", "[3,4,5]"))       # 卷积核尺寸, a list of int. e.g. [3,4,5]
-        self.num_filters = self.config.getint("num_filters")                      # 卷积核数量(channels数)
+        self.num_filter = self.config.getint("num_filter")                      # 卷积核数量(channels数)
         self.is_training = self.config.getboolean("is_training", True)            # 是否训练
 
 
@@ -30,7 +30,7 @@ class TextCNN(BaseModel):
     def __init__(self, config, vocab_size, word_vectors):
         super(TextCNN, self).__init__(config=config, vocab_size=vocab_size, word_vectors=word_vectors)
 
-        self.num_filters_total = self.config.num_filters * len(self.config.filter_sizes)
+        self.num_filters_total = self.config.num_filter * len(self.config.filter_sizes)
         self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
         self.epoch_increment = tf.assign(self.epoch_step, tf.add(self.epoch_step, tf.constant(1)))
 
@@ -89,20 +89,20 @@ class TextCNN(BaseModel):
         for i, filter_size in enumerate(self.config.filter_sizes):
             with tf.name_scope("conv-maxpool-{}".format(filter_size)):
                 # 卷积层
-                filter_shape = [filter_size, self.config.embedding_dim, 1, self.config.num_filters]
+                filter_shape = [filter_size, self.config.embedding_dim, 1, self.config.num_filter]
                 conv_filter = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="filter-{}".format(filter_size))
-                conv_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_filters]), name="filter-{}-b".format(filter_size))
+                conv_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_filter]), name="filter-{}-b".format(filter_size))
                 conv = tf.nn.conv2d(
                     self.embedded_words_expand,
                     conv_filter,
                     strides=[1, 1, 1, 1],
                     padding="VALID",
-                    name="conv-{}".format(filter_size))  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
+                    name="conv-{}".format(filter_size))  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filter]
                 # conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training, scope='cnn_bn_')
 
                 # relu函数的非线性映射
                 # 卷积层的输出h，即每个feature map
-                # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
+                # shape:[batch_size,sequence_length - filter_size + 1,1,num_filter]
                 h = tf.nn.relu(tf.nn.bias_add(conv, conv_b), name="relu")
                 # 池化层
                 # 最大池化，池化是对卷积后的序列取一个最大值,本质上是一个特征向量，最后一个维度是特征代表数量
@@ -111,7 +111,7 @@ class TextCNN(BaseModel):
                     ksize=[1, self.config.sequence_length - filter_size + 1, 1, 1],  # ksize shape: [batch, height, width, channels],一般为[1,height,width,1]，batch和channels上不池化
                     strides=[1, 1, 1, 1],
                     padding='VALID',
-                    name="pool")  # shape: [batch_size, 1, 1, num_filters]
+                    name="pool")  # shape: [batch_size, 1, 1, num_filter]
 
                 pooled_outputs.append(pooled)  # 将三种size的filter的输出一起加入到列表中
 
@@ -138,26 +138,26 @@ class TextCNN(BaseModel):
             with tf.variable_scope("conv-maxpool-{}".format(filter_size)):
                 # Layer1:
                 # 1) CNN->BN->relu
-                filter_shape = [filter_size, self.config.embedding_dim, 1, self.config.num_filters]
+                filter_shape = [filter_size, self.config.embedding_dim, 1, self.config.num_filter]
                 conv_filter = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="conv-filter-{}".format(filter_size))
-                conv_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_filters]), name="conv-filter-{}-b".format(filter_size))
+                conv_b = tf.Variable(tf.constant(0.1, shape=[self.config.num_filter]), name="conv-filter-{}-b".format(filter_size))
 
                 conv = tf.nn.conv2d(
                     self.embedded_words_expand,
                     conv_filter,
                     strides=[1, 1, 1, 1],
                     padding="SAME",
-                    name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
+                    name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filter]
                 conv = tf.contrib.layers.batch_norm(conv, is_training=self.config.is_training, scope='cnn1')
                 h = tf.nn.relu(tf.nn.bias_add(conv, conv_b), "relu")  # shape: [batch_size,sequence_length,1,num_filters]
-                h = tf.reshape(h, [-1, self.config.sequence_length, self.config.num_filters, 1])  # shape: [batch_size,sequence_length,num_filters,1]
+                h = tf.reshape(h, [-1, self.config.sequence_length, self.config.num_filter, 1])  # shape: [batch_size,sequence_length,num_filters,1]
 
 
                 # Layer2:
                 # 2) CNN->BN->relu
-                filter2_shape = [filter_size, self.config.num_filters, 1, self.config.num_filters]
+                filter2_shape = [filter_size, self.config.num_filter, 1, self.config.num_filter]
                 conv_filter2 = tf.Variable(tf.truncated_normal(filter2_shape, stddev=0.1), name="conv2-filter-{}".format(filter_size))
-                conv_b2 = tf.Variable(tf.constant(0.1, shape=[self.config.num_filters]), name="conv2-filter-{}-b".format(filter_size))
+                conv_b2 = tf.Variable(tf.constant(0.1, shape=[self.config.num_filter]), name="conv2-filter-{}-b".format(filter_size))
 
                 conv2 = tf.nn.conv2d(
                     h,
@@ -170,9 +170,9 @@ class TextCNN(BaseModel):
 
                 # Max-pooling
                 pooling_max = tf.squeeze(tf.nn.max_pool(h, ksize=[1, self.config.sequence_length, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name="pool"))
-                # pooling_avg=tf.squeeze(tf.reduce_mean(h,axis=1))     # [batch_size,num_filters]
-                # pooling=tf.concat([pooling_max,pooling_avg],axis=1)  # [batch_size,num_filters*2]
-                pooled_outputs.append(pooling_max)  # [batch_size,num_filters]
+                # pooling_avg=tf.squeeze(tf.reduce_mean(h,axis=1))     # [batch_size,num_filter]
+                # pooling=tf.concat([pooling_max,pooling_avg],axis=1)  # [batch_size,num_filter*2]
+                pooled_outputs.append(pooling_max)  # [batch_size,num_filter]
         # concat
         self.pool_flat_output = tf.concat(pooled_outputs, axis=1)  # [batch_size,num_filters_total]
 

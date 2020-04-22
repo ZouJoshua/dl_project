@@ -61,6 +61,7 @@ class DatasetLoader(DataBase):
 
     def init_vocab(self):
         """
+        初始化词表,标签映射id
         构建词表,标签映射(我以新闻全量数据构建)
         :return:
         """
@@ -69,28 +70,7 @@ class DatasetLoader(DataBase):
                 os.path.exists(self.label2idx_pkl_file):
             self.word2index, self.label2index = self.load_vocab()
         else:
-            # 1，读取原始数据
-            all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
-            if self.word_cut:
-                _clean_data_file = os.path.join(self._data_path, "thuc_news.word.all.txt")
-            else:
-                _clean_data_file = os.path.join(self._data_path, "thuc_news.char.all.txt")
-
-            word_count = dict()
-            labels = list()
-            for word_list, label in self.build_clean_data(all_data_file, _clean_data_file, mode="all"):
-                labels.append(label)
-                for word in word_list:
-                    if word in word_count:
-                        word_count[word] += 1
-                    else:
-                        word_count[word] = 1
-
-            # 2，得到去除低频词和停用词的词汇表
-            words = self.remove_stop_word(word_count)
-
-            # 3，得到词汇表
-            self.word2index, self.label2index = self.gen_vocab(words, labels)
+            self.word2index, self.label2index = self.gen_vocab()
 
         # if os.path.exists(self.embedding_file):
         #     self.log.info("Load word embedding from file: {}".format(self.embedding_file))
@@ -100,6 +80,32 @@ class DatasetLoader(DataBase):
         # self.word_embedding = self.get_word_embedding(words)
 
         self.log.info("*** Init finished ***")
+
+    def _build_vocab(self):
+        """
+        从原始文件读取words,labels
+        :return:
+        """
+        # 1，读取原始数据
+        all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
+        if self.word_cut:
+            _clean_data_file = os.path.join(self._data_path, "thuc_news.word.all.txt")
+        else:
+            _clean_data_file = os.path.join(self._data_path, "thuc_news.char.all.txt")
+
+        word_count = dict()
+        labels = list()
+        for word_list, label in self.build_clean_data(all_data_file, _clean_data_file, mode="all"):
+            labels.append(label)
+            for word in word_list:
+                if word in word_count:
+                    word_count[word] += 1
+                else:
+                    word_count[word] = 1
+
+        # 2，得到去除低频词和停用词的词汇表
+        words = self.remove_stop_word(word_count)
+        return words, labels
 
     def build_clean_data(self, data_file, clean_data_file, mode=""):
         self.log.info("Build {} clean dataset".format(mode))
@@ -149,16 +155,18 @@ class DatasetLoader(DataBase):
 
         return word2index, label2index
 
-    def gen_vocab(self, words, labels):
+    def gen_vocab(self):
         """
         生成词汇，标签等映射表
-        :param words: 训练集所含有的单词
-        :param labels: 标签
         :return:
         """
         self.log.info("Generate mapping tables for vocabulary, labels, etc.")
 
-        spec_tokens = ["<PAD>", "<UNK>", "<CLS>", "<SEP>", "<MASK>", "<NUM>"]
+        # 构建words, labels
+        words, _ = self._build_vocab()
+
+        # 定义特殊token
+        spec_tokens = [self._pad_token, self._unk_token, self._cls_token, self._sep_token, self._mask_token, self._num_token]
         words = spec_tokens + words
 
         # 若vocab的长读小于设置的vocab_size，则选择vocab的长度作为真实的vocab_size
@@ -186,30 +194,6 @@ class DatasetLoader(DataBase):
 
         return word2index, label2index
 
-    def remove_stop_word(self, inputs):
-        """
-        去除低频词和停用词
-        :param inputs: 输入
-        :return:
-        """
-        # all_words = [word for data in inputs for word in data]
-        # word_count = Counter(all_words)  # 统计词频
-        self.log.info("Removing low frequency words and stop words")
-
-        sort_word_count = sorted(inputs.items(), key=lambda x: x[1], reverse=True)
-
-        # 去除低频词
-        words = [item[0] for item in sort_word_count if item[1] >= 10]
-
-        # 如果传入了停用词表，则去除停用词
-        if self._stopwords_file:
-            with open(self._stopwords_file, "r", encoding="utf-8") as fr:
-                stop_words = [line.strip() for line in fr.readlines()]
-            words = [word for word in words if word not in stop_words]
-        self.log.info("Word process finished")
-
-        return words
-
 
     def read_data(self, file, mode=""):
         """
@@ -236,6 +220,31 @@ class DatasetLoader(DataBase):
         text = dict_line["text"]
         label = dict_line["label"]
         return text, label
+
+    def remove_stop_word(self, inputs):
+        """
+        去除低频词和停用词
+        :param inputs: 输入
+        :return:
+        """
+        # all_words = [word for data in inputs for word in data]
+        # word_count = Counter(all_words)  # 统计词频
+        self.log.info("Removing low frequency words and stop words")
+
+        sort_word_count = sorted(inputs.items(), key=lambda x: x[1], reverse=True)
+
+        # 去除低频词
+        words = [item[0] for item in sort_word_count if item[1] >= 10]
+
+        # 如果传入了停用词表，则去除停用词
+        if self._stopwords_file:
+            with open(self._stopwords_file, "r", encoding="utf-8") as fr:
+                stop_words = [line.strip() for line in fr.readlines()]
+            words = [word for word in words if word not in stop_words]
+        self.log.info("Word process finished")
+
+        return words
+
 
     def split_sentence_by_char(self, text):
         """
@@ -338,6 +347,10 @@ class DatasetLoader(DataBase):
 
 
     def get_label_to_index(self):
+        """
+        从文件读取标签映射文件
+        :return:
+        """
         if os.path.exists(self._label2idx_path):
             with open(self._label2idx_path, "r", encoding="utf-8") as fr:
                 return json.load(fr)
@@ -385,7 +398,6 @@ class DatasetLoader(DataBase):
             inputs = inputs + [0] * (sequence_length - len(inputs))
 
         return inputs
-
 
 
     def convert_examples_to_features(self, file_path, pkl_file, mode):
