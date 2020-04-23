@@ -94,9 +94,9 @@ class Trainer(TrainerBase):
         :return:
         """
 
-        # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7, allow_growth=True)
-        # sess_config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True, gpu_options=gpu_options)
-        sess_config = tf.ConfigProto(device_count={"CPU": 4}, log_device_placement=False, allow_soft_placement=True)
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7, allow_growth=True)
+        sess_config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True, gpu_options=gpu_options)
+        # sess_config = tf.ConfigProto(device_count={"CPU": 4}, log_device_placement=False, allow_soft_placement=True)
 
         with tf.Session(config=sess_config) as sess:
             # 初始化变量值
@@ -131,7 +131,15 @@ class Trainer(TrainerBase):
                     msg = "train-step: {0:>6}, ner_loss:{1:>5.4}"
                     self.log.info(msg.format(global_step, loss))
                     if self.data_obj and global_step % self.config.eval_every_step == 0:
-                        self.evaluate(sess, eval_summary_writer, test=False)
+                        dev_loss = self.evaluate(sess, eval_summary_writer, test=False)
+
+                        if dev_loss < dev_best_loss:
+
+                            dev_best_loss = dev_loss
+                            improve = '*'
+                            last_improve = global_step
+                        else:
+                            improve = ''
 
                         if self.config.ckpt_model_path:
                             ckpt_model_path = self.config.ckpt_model_path
@@ -143,13 +151,14 @@ class Trainer(TrainerBase):
                         model_save_path = os.path.join(ckpt_model_path, self.config.model_name)
                         self.model.saver.save(sess, model_save_path, global_step=global_step)
 
-                #         if global_step - last_improve > self.config.require_improvement:
-                #             # 验证集loss超过10个batch没下降，结束训练
-                #             self.log.info("No optimization for a long time, auto-stopping...")
-                #             flag = True
-                #             break
-                # if flag:
-                #     break
+
+                        if global_step - last_improve > self.config.require_improvement:
+                            # 验证集loss超过10个batch没下降，结束训练
+                            self.log.info("No optimization for a long time, auto-stopping...")
+                            flag = True
+                            break
+                if flag:
+                    break
 
     def evaluate(self, sess, summary_writer, test=False):
         ner_results = list()
@@ -174,20 +183,22 @@ class Trainer(TrainerBase):
                 for char, gold, pred in zip(word_list, gold, pred):
                     result.append(" ".join([char, gold, pred]))
                 ner_results.append(result)
+        dev_loss = mean(loss_list)
 
         eval_lines = self.test_ner(ner_results, self.config.output_path)
+        f1 = float(eval_lines[1].strip().split()[-1])
+        msg = "eval-step *** ner_loss:{0:>5.2}, F1_score:{1:>6.2%}"
+        self.log.info(msg.format(dev_loss, f1/100))
         for line in eval_lines:
             self.log.info(line)
-        f1 = float(eval_lines[1].strip().split()[-1])
-        msg = "eval-step loss:{0:>5.2}, F1_score:{1:>6.2%}"
 
-        self.log.info(msg.format(mean(loss_list), f1/100))
         if test:
             best_test_f1 = self.model.best_test_f1.eval()
             if f1 > best_test_f1:
                 tf.assign(self.model.best_test_f1, f1).eval()
                 self.log.info('new best test f1 score:{:>.3f}'.format(f1))
             return f1 > best_test_f1
+        return dev_loss
 
     def test_ner(self, results, path):
         """
