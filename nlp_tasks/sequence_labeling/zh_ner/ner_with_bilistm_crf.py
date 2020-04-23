@@ -14,17 +14,18 @@ import os
 import tensorflow as tf
 import json
 import time
+from model_tensorflow.basic_train import TrainerBase
 from model_tensorflow.ner_bilstm_crf_model import NERTagger
-from nlp_tasks.sequence_labeling.zh_ner.data_utils import get_entity
 from nlp_tasks.sequence_labeling.zh_ner.dataset_loader import DatasetLoader
 from nlp_tasks.sequence_labeling.zh_ner.preprocess_data import bioes_to_bio
 from model_tensorflow.ner_bilstm_crf_model import Config
+from nlp_tasks.sequence_labeling.zh_ner.conlleval import return_report
+from evaluate.custom_metrics import mean
 
 import logging
 from utils.logger import Logger
 from setting import CONFIG_PATH
-from model_tensorflow.basic_train import TrainerBase
-from nlp_tasks.sequence_labeling.zh_ner.conlleval import return_report
+
 
 class Trainer(TrainerBase):
 
@@ -58,7 +59,6 @@ class Trainer(TrainerBase):
 
         self.train_inputs, self.train_labels = self.load_data("train")
         self.log.info("*** Train data size: {} ***".format(len(self.train_labels)))
-        self.log.info("{}".format(self.train_inputs[:2]))
 
         self.eval_inputs, self.eval_labels = self.load_data("test")
         self.log.info("*** Eval data size: {} ***".format(len(self.eval_labels)))
@@ -179,9 +179,9 @@ class Trainer(TrainerBase):
         for line in eval_lines:
             self.log.info(line)
         f1 = float(eval_lines[1].strip().split()[-1])
-        msg = "eval-step loss:{0:>5.2}, F1_score:{3:>6.2%}"
+        msg = "eval-step loss:{0:>5.2}, F1_score:{1:>6.2%}"
 
-        self.log.info(msg.format(sum(loss_list)/len(loss_list), f1))
+        self.log.info(msg.format(mean(loss_list), f1/100))
         if test:
             best_test_f1 = self.model.best_test_f1.eval()
             if f1 > best_test_f1:
@@ -216,7 +216,7 @@ def train_model():
     :return:
     """
     conf_file = os.path.join(CONFIG_PATH, "ner_bilstm_crf.ini")
-    config = Config(conf_file, section="ZH_NER")
+    config = Config(conf_file, section="ZH_NER_BILSTM_CRF")
     output = config.output_path
     if not os.path.exists(output):
         os.makedirs(output)

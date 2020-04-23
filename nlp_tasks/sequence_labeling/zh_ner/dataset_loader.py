@@ -314,6 +314,7 @@ class DatasetLoader(DataBase):
                 words, _ = self.padding(word_list, self.sequence_length)
                 input_id, input_len = self.padding(input, self.sequence_length)
 
+
                 if self.word_cut:
                     # 增加jieba分词特征并做padding
                     segments_id = self.get_seg_features("".join(word_list))
@@ -346,11 +347,11 @@ class DatasetLoader(DataBase):
             corpus_data = pkl.load(open(pkl_file, "rb"))
             word_listx = corpus_data["word_listx"]
             inputs_idx = corpus_data["inputs_idx"]
-            labels_idx = corpus_data["labels_idx"]
             segments_idx = corpus_data["segments_idx"]
+            labels_idx = corpus_data["labels_idx"]
 
         self.log.info("*** Convert examples to features finished ***")
-        return (np.array(word_listx), np.array(inputs_idx), np.array(labels_idx)), np.array(segments_idx)
+        return (np.array(word_listx), np.array(inputs_idx), np.array(segments_idx)), np.array(labels_idx)
 
 
 
@@ -362,7 +363,7 @@ class DatasetLoader(DataBase):
         :param batch_size: 批量的大小
         :return:
         """
-        perm = np.arange(len(x))
+        perm = np.arange(len(y))
         np.random.shuffle(perm)
         x_word_list = x[0][perm]
         x_input1 = x[1][perm]
