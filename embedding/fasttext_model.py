@@ -12,7 +12,7 @@ import os
 import fasttext
 
 
-class FastTextModel:
+class FastTextPreTrainModel:
 
     def __init__(self, train_file,
                  model_path,

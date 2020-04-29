@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 from sklearn import svm
 import pickle
 import pandas as pd
-from nlp_corpus_preprocess.preprocess_tools import clean_en_text
+from preprocess.common_tools import clean_en_text
 from utils.logger import Logger
 from setting import LOG_PATH
 import os

@@ -24,7 +24,7 @@ import os
 config = {}
 config["train_corpus_path"] = os.path.join(DATA_PATH, "corpus", "zhwiki", "bert_train_wiki.txt")
 config["test_corpus_path"] = os.path.join(DATA_PATH, "corpus", "zhwiki", "bert_test_wiki.txt")
-config["word2idx_path"] = os.path.join(DATA_PATH, "bert_pre_trained_model", "zhwiki_bert", "bert_word2idx_extend.json")
+config["word2idx_path"] = os.path.join(DATA_PATH, "pretrained_model", "zhwiki_bert", "bert_word2idx_extend.json")
 config["output_path"] = "./output_wiki_bert"
 
 config["batch_size"] = 1

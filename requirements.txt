@@ -6,6 +6,7 @@ tflearn==0.3.2
 nltk==3.4.4
 gensim==3.4.0
 fasttext==0.8.3
+glove_python==0.1.0
 python-crfsuite==0.9.6
 wordcloud==1.6.0
 pandas==0.24.2

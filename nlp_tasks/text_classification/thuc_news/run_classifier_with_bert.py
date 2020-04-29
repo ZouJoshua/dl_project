@@ -35,13 +35,13 @@ flags.DEFINE_string(
     "for the task.")
 
 flags.DEFINE_string(
-    "bert_config_file", "/data/work/dl_project/data/bert_pre_trained_model/chinese_wwm_ext_tensorflow/bert_config.json",
+    "bert_config_file", "/data/work/dl_project/data/pretrained_model/chinese_wwm_ext_tensorflow/bert_config.json",
     "The config json file corresponding to the pre-trained BERT model. "
     "This specifies the model architecture.")
 
 flags.DEFINE_string("task_name", "thucnews", "The name of the task to train.")
 
-flags.DEFINE_string("vocab_file", "/data/work/dl_project/data/bert_pre_trained_model/chinese_wwm_ext_tensorflow/vocab.txt",
+flags.DEFINE_string("vocab_file", "/data/work/dl_project/data/pretrained_model/chinese_wwm_ext_tensorflow/vocab.txt",
                     "The vocabulary file that the BERT model was trained on.")
 
 flags.DEFINE_string(
@@ -51,7 +51,7 @@ flags.DEFINE_string(
 ## Other parameters
 
 flags.DEFINE_string(
-    "init_checkpoint", "/data/work/dl_project/data/bert_pre_trained_model/chinese_wwm_ext_tensorflow/bert_model.ckpt",
+    "init_checkpoint", "/data/work/dl_project/data/pretrained_model/chinese_wwm_ext_tensorflow/bert_model.ckpt",
     "Initial checkpoint (usually from a pre-trained BERT model).")
 
 flags.DEFINE_bool(

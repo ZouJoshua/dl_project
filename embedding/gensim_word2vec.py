@@ -9,7 +9,7 @@
 
 
 from gensim.models import word2vec
-from preprocess.tools import split_text, read_txt_file
+from preprocess.common_tools import split_text, read_txt_file
 
 
 class GensimWord2VecModel:
