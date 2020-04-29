@@ -36,4 +36,4 @@ class TextRNNAttentionClassifier(TextClassifier):
         return model
 
     def train(self, batch_size=512, epochs=20):
-        super(TextRNNAttentionClassifier,self).train(128,3)
+        super(TextRNNAttentionClassifier, self).train(128, 3)

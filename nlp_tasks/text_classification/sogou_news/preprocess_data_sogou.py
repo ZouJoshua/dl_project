@@ -24,7 +24,9 @@ class PreCorpus(object):
 
     def __init__(self, ori_file_dir, output_path, is_xml_file=None):
         self.corpus_file = os.path.join(output_path, "sogou_corpus")
+        self.url2label = os.path.join(output_path, "url2label.txt")
         self.corpus_file_with_label = os.path.join(output_path, "sogou_corpus_with_label")
+        self.corpus_file_without_label = os.path.join(output_path, "sogou_corpus_without_label")
         self.url_file_without_label = os.path.join(output_path, "url_without_label")
         self.domain_count_file = os.path.join(output_path, "url_domain_count.txt")
         self.label_count_file = os.path.join(output_path, "url_label_count.txt")
@@ -42,7 +44,10 @@ class PreCorpus(object):
 
         if not os.path.exists(self.corpus_file_with_label):
             self.analysis_url(self.corpus_file, self.domain_count_file, self.label_count_file)
-
+            self.pre_corpus(self.corpus_file, self.url2label, self.corpus_file_with_label, self.corpus_file_without_label)
+        else:
+            print("Find corpus file with label in {}".format(self.corpus_file_with_label))
+            print("Find corpus file without label in {}".format(self.corpus_file_without_label))
 
 
     def listdir(self, path, list_name):
@@ -197,6 +202,9 @@ class PreCorpus(object):
 
 
 
+
+
+
 class SplitData2tsv(object):
     """
     切分训练集\测试集\验证集
@@ -305,14 +313,8 @@ class SplitData2tsv(object):
 
 def main():
     ori_file_dir = "/data/common/sogou_data"
-    data_path = os.path.join(DATA_PATH, "sogou")
+    data_path = os.path.join(DATA_PATH, "corpus", "sogou")
     PreCorpus(ori_file_dir, data_path, is_xml_file=True)
-    label_file = os.path.join(data_path, "url2label.txt")
-    # extract_docs(ori_file_dir, outfile)
-    # extract_docs_from_xml_file(xml_file, outfile)
-    # extract_label(outfile)
-    # analysis_url(outfile, domain_count_file, label_count_file)
-    # pre_corpus(outfile, label_file, outfile1, outfile2)
     # SplitData2tsv(outfile1, data_path)
 
 
