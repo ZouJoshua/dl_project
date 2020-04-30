@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 12/17/19 12:54 PM
-@File    : preprocess_data_sogou.py
+@File    : preprocess_data.py
 @Desc    : 搜狗新闻数据处理
 
 """
@@ -12,6 +12,7 @@
 import os
 import re
 import json
+import random
 from urllib.parse import urlparse
 from sklearn.model_selection import StratifiedKFold
 import jieba
@@ -24,7 +25,7 @@ class PreCorpus(object):
 
     def __init__(self, ori_file_dir, output_path, is_xml_file=None):
         self.corpus_file = os.path.join(output_path, "sogou_corpus")
-        self.url2label = os.path.join(output_path, "url2label.txt")
+        self.url2label = os.path.join(output_path, "sogou_url2label.json")
         self.corpus_file_with_label = os.path.join(output_path, "sogou_corpus_with_label")
         self.corpus_file_without_label = os.path.join(output_path, "sogou_corpus_without_label")
         self.url_file_without_label = os.path.join(output_path, "url_without_label")
@@ -32,11 +33,12 @@ class PreCorpus(object):
         self.label_count_file = os.path.join(output_path, "url_label_count.txt")
         if not os.path.exists(self.corpus_file):
             if is_xml_file:
-                ori_file = os.path.join(ori_file_dir, "news_sohusite_xml.dat")
+                # ori_file = os.path.join(ori_file_dir, "news_sohusite_xml.dat")  # 搜狐新闻
+                ori_file = os.path.join(ori_file_dir, "news_tensite_xml.dat")  # 搜狗全网新闻
                 if os.path.exists(ori_file):
                     self.extract_docs_from_xml_file(ori_file, self.corpus_file)
                 else:
-                    raise Exception("Ori_file {} not found".format("news_sohusite_xml.dat"))
+                    raise Exception("Ori_file {} not found".format(ori_file))
             else:
                 self.extract_docs(ori_file_dir, self.corpus_file)
         else:
@@ -60,9 +62,9 @@ class PreCorpus(object):
         for file in os.listdir(path):
             file_path = os.path.join(path, file)
             if os.path.isdir(file_path):
-                    self.listdir(file_path, list_name)
+                self.listdir(file_path, list_name)
             else:
-                    list_name.append(file_path)
+                list_name.append(file_path)
 
     def extract_docs(self, file_dir, outfile):
         """
@@ -116,13 +118,18 @@ class PreCorpus(object):
         :param url2label_dict:
         :return:
         """
-        labels = netloc.split(".")
+        # labels = netloc.split(".")
+        # label = ""
+        # if netloc == "news.china.com":
+        #     label = "社会"
+        # for la in labels:
+        #     if la in url2label_dict:
+        #         label = url2label_dict[la]
         label = ""
-        if netloc == "news.china.com":
-            label = "社会"
-        for la in labels:
-            if la in url2label_dict:
-                label = url2label_dict[la]
+        if netloc in url2label_dict:
+            label = url2label_dict[netloc]
+        else:
+            pass
 
         return label
 
@@ -188,15 +195,16 @@ class PreCorpus(object):
                 url_parse = urlparse(url)
                 netloc = url_parse.netloc
                 label = self.extract_label(netloc, url2label_dict)
-                line["category"] = label
-                if label != "":
-                    cf.write(json.dumps(line, ensure_ascii=False) + "\n")
-                    if label not in labels:
-                        labels[label] = 1
+                if label not in ["其他"]:
+                    line["category"] = label
+                    if label != "":
+                        cf.write(json.dumps(line, ensure_ascii=False) + "\n")
+                        if label not in labels:
+                            labels[label] = 1
+                        else:
+                            labels[label] += 1
                     else:
-                        labels[label] += 1
-                else:
-                    uf.write(url+"\n")
+                        uf.write(url+"\n")
                 del url
             print(labels)
 
@@ -276,21 +284,20 @@ class SplitData2tsv(object):
         :return:
         """
         skf = StratifiedKFold(n_splits=int(1 / valid_portion))
-        i = 0
         train = None
         dev = None
-        for train_index, test_index in skf.split(x, y):
-            train_label_count = self._label_count([y[i] for i in train_index])
-            test_label_count = self._label_count([y[j] for j in test_index])
-            print("train_label_count: {}".format(json.dumps(train_label_count, indent=4, ensure_ascii=False)))
-            print("test_label_count: {}".format(json.dumps(test_label_count, indent=4, ensure_ascii=False)))
-            train = [x[i] + "\t__label__" + y[i] for i in train_index]
-            dev = [x[j] + "\t__label__" + y[j] for j in test_index]
-            i += 1
-            if i < 2:
-                break
+
+        index = [(train_index, test_index) for train_index, test_index in skf.split(x, y)]
+
+        train_label_count = self._label_count([y[i] for i in index[0][0]])
+        test_label_count = self._label_count([y[j] for j in index[0][1]])
+        print("train_label_count: {}".format(json.dumps(train_label_count, indent=4, ensure_ascii=False)))
+        print("test_label_count: {}".format(json.dumps(test_label_count, indent=4, ensure_ascii=False)))
+        train = [x[i] + "\t__label__" + y[i] for i in index[0][0]]
+        dev = [x[j] + "\t__label__" + y[j] for j in index[0][1]]
 
         return train, dev
+
 
     def write_tvs_file(self, data, file):
         print(">>>>> 正在写入文件")
@@ -310,10 +317,51 @@ class SplitData2tsv(object):
 
 
 
+class GetSample(object):
+
+
+    def get_data_example_to_file(self, file, out_file):
+        """
+        从原始数据中每个样本抽取1000到文件
+        :param file: 原始文件
+        :param out_file: example文件
+        :return:
+        """
+        lines = read_json_format_file(file)
+        all_data = dict()
+
+        for line in lines:
+            if not line:
+                continue
+            title = line["title"]
+            label = line["category"]
+            if label in all_data:
+                all_data[label].append(title)
+            else:
+                all_data[label] = list()
+                all_data[label].append(title)
+
+
+        with open(out_file, "w", encoding="utf-8") as f:
+            for k, v in all_data.items():
+                random.shuffle(v)
+                print("label:{} ".format())
+                i = 0
+                for text in v:
+                    out = dict()
+                    if len(text) > 5 and len(text) < 50:
+                        out["label"] = k
+                        out["text"] = text
+                        f.write(json.dumps(out, ensure_ascii=False) + "\n")
+                        i += 1
+                        if i >= 1000:
+                            break
+
+
 
 def main():
     ori_file_dir = "/data/common/sogou_data"
-    data_path = os.path.join(DATA_PATH, "corpus", "sogou")
+    data_path = os.path.join(DATA_PATH, "corpus", "sogou_news")
     PreCorpus(ori_file_dir, data_path, is_xml_file=True)
     # SplitData2tsv(outfile1, data_path)
 

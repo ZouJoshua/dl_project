@@ -41,7 +41,7 @@ def main():
     log = Logger("fasttext_train_log", log2console=True, log2file=True, logfile=log_file).get_logger()
     config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
     config_section = "fasttext.args_zh"
-    corpus_path = os.path.join(DATA_PATH, "sogou")
+    corpus_path = os.path.join(DATA_PATH, "corpus", "sogou_news")
     model = SogouCategoryModel(corpus_path, config_file, config_section, corpus_path)
 
 
