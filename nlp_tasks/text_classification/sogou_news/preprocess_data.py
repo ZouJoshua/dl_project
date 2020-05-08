@@ -344,8 +344,10 @@ class GetSample(object):
 
         with open(out_file, "w", encoding="utf-8") as f:
             for k, v in all_data.items():
+                if k in ["日本", "海南", "俄罗斯", "重庆", "韩国", "福建", "江苏", "广西", "安徽", "四川", "世界", "青海", "地方", "潍坊", "陕西", "天气", "评论", "读书", "媒体", "访谈", "奥运", "视频", "人民日报", "考试"]:
+                    continue
                 random.shuffle(v)
-                print("label:{} ".format())
+                print("label:{}  size:{}".format(k, len(v)))
                 i = 0
                 for text in v:
                     out = dict()
@@ -362,8 +364,11 @@ class GetSample(object):
 def main():
     ori_file_dir = "/data/common/sogou_data"
     data_path = os.path.join(DATA_PATH, "corpus", "sogou_news")
-    PreCorpus(ori_file_dir, data_path, is_xml_file=True)
+    data_file = os.path.join(data_path, "sogou_corpus_with_label")
+    sample_file = os.path.join(data_path, "sogou_news_sample")
+    # PreCorpus(ori_file_dir, data_path, is_xml_file=True)
     # SplitData2tsv(outfile1, data_path)
+    GetSample().get_data_example_to_file(data_file, sample_file)
 
 
 
