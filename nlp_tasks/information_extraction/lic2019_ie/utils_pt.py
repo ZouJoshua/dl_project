@@ -357,7 +357,7 @@ def get_text_spolist(opt, p_entRel_t, json_data):
             o_s, o_e, s_s, s_e, r = p_sample
             if r == 49:
                 continue
-            obj, sbj = '',''
+            obj, sbj = '', ''
             if max(o_s, o_e, s_s, s_e) >= len(word_list):
                 continue
             for i in range(o_s, o_e+1):

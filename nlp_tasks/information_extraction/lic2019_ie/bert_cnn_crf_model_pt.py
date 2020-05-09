@@ -92,9 +92,9 @@ class BERT_CNN_CRF(BasicModule):
             type_obj = type_obj.cuda()
             type_sbj = type_sbj.cuda()
             type_mid = type_mid.cuda()
-        obj_vecs = sen_matrix[s1:e1+1,:] + self.type_emb(type_obj)
-        sbj_vecs = sen_matrix[s2:e2+1,:] + self.type_emb(type_sbj)
-        mid_vecs = sen_matrix[m_s:m_e+1,:] + self.type_emb(type_mid)
+        obj_vecs = sen_matrix[s1:e1+1, :] + self.type_emb(type_obj)
+        sbj_vecs = sen_matrix[s2:e2+1, :] + self.type_emb(type_sbj)
+        mid_vecs = sen_matrix[m_s:m_e+1, :] + self.type_emb(type_mid)
 
         sample_matrix = torch.cat([obj_vecs, sbj_vecs, mid_vecs], 0)
         if sample_matrix.size(0) < self.opt.tuple_max_len:
@@ -105,7 +105,7 @@ class BERT_CNN_CRF(BasicModule):
             sample_matrix = torch.cat([sample_matrix, pad], 0)
         else:
             length = self.opt.tuple_max_len
-            sample_matrix = sample_matrix[:self.opt.tuple_max_len,:]
+            sample_matrix = sample_matrix[:self.opt.tuple_max_len, :]
         return sample_matrix, length
 
     def forward(self, batch_data, tags=None, entRels=None):
@@ -131,7 +131,7 @@ class BERT_CNN_CRF(BasicModule):
         if tags is None:
             entRels = self.match_entities(logits)
         for idx, sen_ent_rels in enumerate(entRels):
-            sen_matrix = sequence_output[idx,:,:]
+            sen_matrix = sequence_output[idx, :, :]
             for sample in sen_ent_rels:
                 # sample [s1, e1, s2, e2, r]
                 sample_matrix, length = self.get_ent_pair_matrix(sample[:4], sen_matrix)
@@ -168,7 +168,7 @@ class BERT_CNN_CRF(BasicModule):
             for t, e in enumerate(entRel):
                 entPostion = entRel[t]
                 entPostion[-1] = out[idx].item()
-                idx+=1
+                idx += 1
                 if entPostion[-1] == 49:
                     continue
                 sen_pair.append(entPostion)
