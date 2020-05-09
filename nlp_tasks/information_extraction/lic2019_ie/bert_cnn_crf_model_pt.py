@@ -9,7 +9,7 @@
 """
 
 
-from .BasicModule import BasicModule
+from model_pytorch.basic_model import BasicModule
 from pytorch_pretrained_bert import BertForTokenClassification
 import torch.nn as nn
 from metrics import get_entities

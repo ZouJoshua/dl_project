@@ -122,28 +122,30 @@
 >- NLP任务: `nlp_tasks`
 
     - NLP项目
-        ├── chatbot
-        |    聊天机器人
-        ├── information_extraction
-        │    信息抽取任务
-        ├── knowledge_graph
-        │    知识图谱任务
-        ├── new_words_mininag
-        |    新词挖掘任务
-        ├── pretrain
-        │    预训练任务
-        ├── sensitive_words
-        |     敏感词任务
-        ├── sentiment_analysis
-        │     情感分析任务
-        ├── sequence_labeling
-        │     序列标注任务
-        ├── text_classification
-        │     文本分类任务
-        ├── text_generation
-        │     文本生成任务
-        └── textsum
-              文本摘要任务
+        ├── chatbot                          # 聊天机器人
+        ├── information_extraction           # 信息抽取任务
+        │   ├── chinese_ie  # 中文ner信息抽取项目
+        │   └── lic2019_ie  # 2019年语言信息抽取比赛项目
+        ├── knowledge_graph                  # 知识图谱任务
+        │   └── stroke
+        ├── new_words_mininag                # 新词挖掘任务
+        ├── pretrain                         # 预训练任务
+        │   └── zhwiki_bert  # 知乎预训练项目
+        ├── sensitive_words                  # 敏感词任务
+        ├── sentiment_analysis               # 情感分析任务
+        │   └── hotel_reviews  # 酒店评论情感分析项目
+        ├── sequence_labeling                # 序列标注任务
+        │   └── zh_ner  # 中文ner
+        ├── text_classification              # 文本分类任务
+        │   ├── brief_news  # 简讯文本分类项目
+        │   ├── imdb  # 互联网电影分类项目
+        │   ├── sogou_news  # 搜狗新闻分类项目
+        │   ├── thuc_news  # 清华新闻文本分类项目
+        │   └── toutiao_news  # 头条短新闻文本分类项目
+        ├── text_generation                  # 文本生成任务
+        │   └── flickr30K  # 看图说话项目
+        └── textsum                          # 文本摘要任务
+ 
     
 >- 图像任务: `image_tasks`
     
