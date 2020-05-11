@@ -2,17 +2,22 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 5/9/20 7:28 PM
-@File    : ie_preprocess.py
+@Time    : 5/11/20 2:29 PM
+@File    : utils_nlp.py
 @Desc    : 
 
 """
 
+'''
+Miscellaneous utility functions for natural language processing
+'''
 import codecs
-import re
-import nlp_tasks.information_extraction.ie_utils as utils
 import os
+import re
+
 import numpy as np
+
+from neuroner import utils
 
 
 def load_tokens_from_pretrained_token_embeddings(parameters):
@@ -93,15 +98,9 @@ def replace_unicode_whitespaces_with_ascii_whitespace(string):
 
 
 def end_current_entity(previous_label_without_bio, current_entity_length, new_labels, i):
-    """
+    '''
     Helper function for bio_to_bioes
-    :param previous_label_without_bio:
-    :param current_entity_length:
-    :param new_labels:
-    :param i:
-    :return:
-    """
-
+    '''
     if current_entity_length == 0:
         return
     if current_entity_length == 1:
@@ -161,11 +160,6 @@ def check_bio_bioes_compatibility(labels_bio, labels_bioes):
 
 
 def check_validity_of_conll_bioes(bioes_filepath):
-    """
-    检查文件格式
-    :param bioes_filepath:
-    :return:
-    """
     dataset_type = utils.get_basename_without_extension(bioes_filepath).split('_')[0]
     print("Checking validity of CONLL BIOES format... ".format(dataset_type), end='')
 
@@ -191,14 +185,9 @@ def check_validity_of_conll_bioes(bioes_filepath):
 
 
 def output_conll_lines_with_bioes(split_lines, labels, output_conll_file):
-    """
+    '''
     Helper function for convert_conll_from_bio_to_bioes
-    :param split_lines:
-    :param labels:
-    :param output_conll_file:
-    :return:
-    """
-
+    '''
     if labels == []:
         return
     new_labels = bio_to_bioes(labels)
@@ -210,12 +199,6 @@ def output_conll_lines_with_bioes(split_lines, labels, output_conll_file):
 
 
 def convert_conll_from_bio_to_bioes(input_conll_filepath, output_conll_filepath):
-    """
-    bio标注格式转化为bioes格式
-    :param input_conll_filepath:
-    :param output_conll_filepath:
-    :return:
-    """
     if os.path.exists(output_conll_filepath):
         if check_validity_of_conll_bioes(output_conll_filepath):
             return

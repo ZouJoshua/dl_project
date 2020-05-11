@@ -2,28 +2,29 @@
 # -*- coding: utf-8 -*-
 """
 @Author  : Joshua
-@Time    : 5/9/20 7:16 PM
-@File    : ie_plots.py
-@Desc    : 
+@Time    : 5/11/20 2:30 PM
+@File    : utils_plots.py
+@Desc    : Miscellaneous functions for plots
 
 """
 
 from __future__ import print_function
 from __future__ import division
-import numpy as np
-import matplotlib
 
-matplotlib.use('Agg')  # http://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
-import matplotlib.pyplot as plt
-import sklearn.preprocessing
+import matplotlib
 from matplotlib import cm
+import matplotlib.pyplot as plt
+
+# http://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
+matplotlib.use('Agg')
+import numpy as np
+import sklearn.preprocessing
 
 
 def get_cmap():
-    """
+    '''
     http://stackoverflow.com/questions/37517587/how-can-i-change-the-intensity-of-a-colormap-in-matplotlib
-    :return:
-    """
+    '''
     cmap = cm.get_cmap('RdBu', 256)  # set how many colors you want in color map
     # modify colormap
     alpha = 1.0
@@ -38,18 +39,13 @@ def get_cmap():
 
 
 def show_values(pc, fmt="%.2f", **kw):
-    """
+    '''
     Heatmap with text in each cell with matplotlib's pyplot
     Source: http://stackoverflow.com/a/25074150/395857
     By HYRY
-    :param pc:
-    :param fmt:
-    :param kw:
-    :return:
-    """
-
+    '''
     pc.update_scalarmappable()
-    ax = pc.axes  # changed from: ax = pc.get_axes()
+    ax = pc.axes
     for p, color, value in zip(pc.get_paths(), pc.get_facecolors(), pc.get_array()):
         x, y = p.vertices[:-2, :].mean(0)
         if np.all(color[:3] > 0.5):
@@ -60,13 +56,11 @@ def show_values(pc, fmt="%.2f", **kw):
 
 
 def cm2inch(*tupl):
-    """
+    '''
     Specify figure size in centimeter in matplotlib
     Source: http://stackoverflow.com/a/22787457/395857
     By gns-ank
-    :param tupl:
-    :return:
-    """
+    '''
     inch = 2.54
     if type(tupl[0]) == tuple:
         return tuple(i / inch for i in tupl[0])
@@ -76,28 +70,11 @@ def cm2inch(*tupl):
 
 def heatmap(AUC, title, xlabel, ylabel, xticklabels, yticklabels, figure_width=40, figure_height=20, correct_orientation=False, cmap='RdBu',
             fmt="%.2f", graph_filepath='', normalize=False, remove_diagonal=False):
-
-    """
+    '''
     Inspired by:
     - http://stackoverflow.com/a/16124677/395857
     - http://stackoverflow.com/a/25074150/395857
-    :param AUC:
-    :param title:
-    :param xlabel:
-    :param ylabel:
-    :param xticklabels:
-    :param yticklabels:
-    :param figure_width:
-    :param figure_height:
-    :param correct_orientation:
-    :param cmap:
-    :param fmt:
-    :param graph_filepath:
-    :param normalize:
-    :param remove_diagonal:
-    :return:
-    """
-
+    '''
     if normalize:
         AUC = sklearn.preprocessing.normalize(AUC, norm='l1', axis=1)
 
@@ -164,16 +141,10 @@ def heatmap(AUC, title, xlabel, ylabel, xticklabels, yticklabels, figure_width=4
 
 
 def plot_classification_report(classification_report, title='Classification report ', cmap='RdBu', from_conll_json=False):
-    """
+    '''
     Plot scikit-learn classification report.
     Extension based on http://stackoverflow.com/a/31689645/395857
-    :param classification_report:
-    :param title:
-    :param cmap:
-    :param from_conll_json:
-    :return:
-    """
-
+    '''
     classes = []
     plotMat = []
     support = []
@@ -187,8 +158,7 @@ def plot_classification_report(classification_report, title='Classification repo
     else:
         lines = classification_report.split('\n')
         for line in lines[2: (len(lines) - 1)]:
-            # t = line.strip().replace('avg / total', 'micro-avg').split() # for scikit-learn 0.19.0
-            t = line.strip().replace(' avg', '-avg').split()  # for scikit-learn 0.20.0
+            t = line.strip().replace(' avg', '-avg').split()
             if len(t) < 2: continue
             classes.append(t[0])
             v = [float(x) * 100 for x in t[1: len(t) - 1]]
