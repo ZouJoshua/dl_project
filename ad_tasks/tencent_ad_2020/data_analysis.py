@@ -129,14 +129,120 @@ def analysis_ad(file, outfile):
     print("--- details of advertiser industry info ---")
     print("{}".format(json.dumps(sort_industry, indent=4)))
 
+def analysis_user(file, outfile):
+    if not os.path.exists(outfile):
+        user_info = write_user_analysis_details_to_file(file, outfile)
+    else:
+        user_info = read_data_from_json_file(outfile)
+
+    # 用户信息统计
+    print("\nall age: {}".format(user_info["age_info"].keys()))
+    sort_age = dict_sort(user_info["age_info"])
+    print("--- details of age info ---")
+    print("{}".format(json.dumps(sort_age, indent=4)))
+    print("\nall gender: {}".format(user_info["gender_info"].keys()))
+    sort_gender = dict_sort(user_info["gender_info"])
+    print("--- details of gender info ---")
+    print("{}".format(json.dumps(sort_gender, indent=4)))
+    print("\nall age with gender: {}".format(user_info["age_gender_info"].keys()))
+    sort_age_gender = dict_sort(user_info["age_gender_info"])
+    print("--- details of age with gender info ---")
+    print("{}".format(json.dumps(sort_age_gender, indent=4)))
+
+
+
+def write_user_analysis_details_to_file(file, outfile):
+    print("start writing user analysis details to file: {}".format(outfile))
+    user_info = dict()
+    user_info["age_info"] = dict()
+    user_info["gender_info"] = dict()
+    user_info["age_gender_info"] = dict()
+    _count = 0
+
+    for line in read_data_from_csv_file(file):
+        _count += 1
+        if _count < 6:
+            print(line)
+        # else:
+        #     break
+        # 用户信息
+        age_gender = "{}_{}".format(line[1], line[2])
+        if age_gender in user_info["age_gender_info"]:
+            user_info["age_gender_info"][age_gender] += 1
+            if line[1] in user_info["age_info"]:
+                user_info["age_info"][line[1]] += 1
+            else:
+                user_info["age_info"][line[1]] = 1
+            if line[2] in user_info["gender_info"]:
+                user_info["gender_info"][line[2]] += 1
+            else:
+                user_info["gender_info"][line[2]] = 1
+
+        else:
+            user_info["age_gender_info"][age_gender] = dict()
+            user_info["age_gender_info"][age_gender] = 1
+
+    print("data with {} lines".format(_count))
+    with open(outfile, "w", encoding="utf-8") as f:
+        f.write(json.dumps(user_info, ensure_ascii=False, indent=4))
+    print("write down")
+    return user_info
+
+def analysis_click(file, outfile):
+    if not os.path.exists(outfile):
+        click_info = write_click_analysis_details_to_file(file, outfile)
+    else:
+        click_info = read_data_from_json_file(outfile)
+    click_info
+
+def write_click_analysis_details_to_file(file, outfile):
+    print("start writing click analysis details to file: {}".format(outfile))
+    click_info = dict()
+    click_info["age_info"] = dict()
+    click_info["gender_info"] = dict()
+    click_info["age_gender_info"] = dict()
+    _count = 0
+
+    for line in read_data_from_csv_file(file):
+        _count += 1
+        if _count < 6:
+            print(line)
+        # else:
+        #     break
+        # 用户信息
+        age_gender = "{}_{}".format(line[1], line[2])
+        if age_gender in click_info["age_gender_info"]:
+            click_info["age_gender_info"][age_gender] += 1
+            if line[1] in click_info["age_info"]:
+                click_info["age_info"][line[1]] += 1
+            else:
+                click_info["age_info"][line[1]] = 1
+            if line[2] in click_info["gender_info"]:
+                click_info["gender_info"][line[2]] += 1
+            else:
+                click_info["gender_info"][line[2]] = 1
+
+        else:
+            click_info["age_gender_info"][age_gender] = dict()
+            click_info["age_gender_info"][age_gender] = 1
+
+    print("data with {} lines".format(_count))
+    with open(outfile, "w", encoding="utf-8") as f:
+        f.write(json.dumps(click_info, ensure_ascii=False, indent=4))
+    print("write down")
+    return click_info
+
 
 ad_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad.csv"
 ad_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad_analysis.json"
 
 user_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user.csv"
+user_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user_analysis.json"
 click_log_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log.csv"
 
-analysis_ad(ad_data_file, ad_data_analysis_file)
+# analysis_ad(ad_data_file, ad_data_analysis_file)
+analysis_user(user_data_file, user_data_analysis_file)
+
 
 # user_data = read_data_from_csv(user_data_file)
 #
