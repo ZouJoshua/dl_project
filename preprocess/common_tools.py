@@ -6,8 +6,7 @@
 @File    : common_tools.py
 @Desc    : 通用预处理方法
 """
-
-
+import csv
 import json
 import os
 from pyquery import PyQuery
@@ -16,6 +15,28 @@ import re
 import string
 import emoji
 import time
+
+
+def read_data_from_csv_file(file):
+    """
+    读取csv文件,返回迭代器
+    :param file:
+    :return:
+    """
+    # data = list()
+    if not os.path.exists(file):
+        raise FileNotFoundError("【{}】文件未找到，请检查".format(file))
+    print(">>>>> 正在读原始取数据文件：{}".format(file))
+    with open(file, "r", encoding="utf-8-sig") as csvfile:
+        csv_reader = csv.reader(csvfile)  # 使用csv.reader读取csvfile中的文件
+        header = next(csv_reader)  # 读取第一行每一列的标题
+        print(">>>>> 数据表头 Header: \n{}".format(header))
+        for i, row in enumerate(csv_reader):   # 将 csv 文件中的数据保存到data中
+            # data.append(row)
+            # if i < 5:
+            #     print(row)
+            yield row
+
 
 def read_json_format_file(file):
     """
@@ -135,7 +156,7 @@ def split_text(text, lower=True, stop=None):
 
 def dict_sort(result, limit_num=None):
     """
-    字典排序
+    字典排序, 返回有序字典
     :param result:
     :param limit_num:
     :return:
