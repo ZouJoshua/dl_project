@@ -12,6 +12,7 @@
 import csv
 import json
 import os
+import matplotlib.pyplot as plt
 from collections import OrderedDict
 
 
@@ -188,19 +189,41 @@ def write_user_analysis_details_to_file(file, outfile):
     print("write down")
     return user_info
 
+
+def plot_user_click_dist(all_text_len, save_path=None):
+    """
+    绘制文本长度分布
+    :param all_text_len: [22,33,34,...]
+    :param save_path: 图片保存路径
+    :return:
+    """
+    plt.figure()
+    plt.title("Length dist of user click times")
+    plt.xlabel("Length")
+    plt.ylabel("Count")
+    _, _, all_data = plt.hist(all_text_len, bins=100, normed=1, alpha=.2, color="b")
+    plt.show()
+    if save_path:
+        plt.savefig(save_path)
+
+
 def analysis_click(file, outfile):
     if not os.path.exists(outfile):
         click_info = write_click_analysis_details_to_file(file, outfile)
     else:
         click_info = read_data_from_json_file(outfile)
-    click_info
+    # 用户点击信息统计绘图
+    user_total_click_times = list()
+    user_total_click_days = list()
+    for _ in click_info.keys():
+        user_total_click_times.append(int(click_info["total_click_times_info"]))
+        user_total_click_days.append(int(click_info["total_click_days_info"]["_count"]))
+    plot_user_click_dist(user_total_click_times)
+    plot_user_click_dist(user_total_click_days)
 
 def write_click_analysis_details_to_file(file, outfile):
     print("start writing click analysis details to file: {}".format(outfile))
     click_info = dict()
-    click_info["age_info"] = dict()
-    click_info["gender_info"] = dict()
-    click_info["age_gender_info"] = dict()
     _count = 0
 
     for line in read_data_from_csv_file(file):
@@ -209,22 +232,21 @@ def write_click_analysis_details_to_file(file, outfile):
             print(line)
         # else:
         #     break
-        # 用户信息
-        age_gender = "{}_{}".format(line[1], line[2])
-        if age_gender in click_info["age_gender_info"]:
-            click_info["age_gender_info"][age_gender] += 1
-            if line[1] in click_info["age_info"]:
-                click_info["age_info"][line[1]] += 1
+        # 用户点击信息
+        if line[1] in click_info:
+            click_info[line[1]]["total_click_times_info"] += int(line[3])
+            if line[0] not in click_info[line[1]]["total_click_days_info"]:
+                click_info[line[1]]["total_click_days_info"][line[0]] = 1
+                click_info[line[1]]["total_click_days_info"]["_count"] += 1
             else:
-                click_info["age_info"][line[1]] = 1
-            if line[2] in click_info["gender_info"]:
-                click_info["gender_info"][line[2]] += 1
-            else:
-                click_info["gender_info"][line[2]] = 1
-
+                click_info[line[1]]["total_click_days_info"][line[0]] += 1
         else:
-            click_info["age_gender_info"][age_gender] = dict()
-            click_info["age_gender_info"][age_gender] = 1
+            click_info[line[1]] = dict()
+            click_info[line[1]]["total_click_times_info"] = int(line[3])
+            click_info[line[1]]["total_click_days_info"] = dict()
+            click_info[line[1]]["total_click_days_info"][line[0]] = 1
+            click_info[line[1]]["total_click_days_info"]["_count"] = 1
+
 
     print("data with {} lines".format(_count))
     with open(outfile, "w", encoding="utf-8") as f:
@@ -239,10 +261,11 @@ ad_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train
 user_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user.csv"
 user_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user_analysis.json"
 click_log_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log.csv"
+click_log_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log_analysis.json"
 
 # analysis_ad(ad_data_file, ad_data_analysis_file)
-analysis_user(user_data_file, user_data_analysis_file)
-
+# analysis_user(user_data_file, user_data_analysis_file)
+analysis_click(click_log_data_file, click_log_data_analysis_file)
 
 # user_data = read_data_from_csv(user_data_file)
 #
