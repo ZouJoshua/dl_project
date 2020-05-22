@@ -13,6 +13,8 @@ import csv
 import json
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
+from tqdm import tqdm
 from collections import OrderedDict
 
 
@@ -22,7 +24,7 @@ def read_data_from_csv_file(file):
         csv_reader = csv.reader(csvfile)  # 使用csv.reader读取csvfile中的文件
         header = next(csv_reader)  # 读取第一行每一列的标题
         print("data header: {}".format(header))
-        for i, row in enumerate(csv_reader):   # 将 csv 文件中的数据保存到data中
+        for i, row in enumerate(tqdm(csv_reader, desc="Reading Files of {}".format(file))):   # 将 csv 文件中的数据保存到data中
             # data.append(row)
             # if i < 5:
             #     print(row)
@@ -190,18 +192,18 @@ def write_user_analysis_details_to_file(file, outfile):
     return user_info
 
 
-def plot_user_click_dist(all_text_len, save_path=None):
+def plot_user_click_dist(all_text_len, desc="data", save_path=None):
     """
-    绘制文本长度分布
+    绘制用户点击次数分布
     :param all_text_len: [22,33,34,...]
     :param save_path: 图片保存路径
     :return:
     """
     plt.figure()
-    plt.title("Length dist of user click times")
+    plt.title("Length dist of {}".format(desc))
     plt.xlabel("Length")
     plt.ylabel("Count")
-    _, _, all_data = plt.hist(all_text_len, bins=100, normed=1, alpha=.2, color="b")
+    _, _, all_data = plt.hist(all_text_len, bins=100, density=True, alpha=.2, color="b")
     plt.show()
     if save_path:
         plt.savefig(save_path)
@@ -213,13 +215,37 @@ def analysis_click(file, outfile):
     else:
         click_info = read_data_from_json_file(outfile)
     # 用户点击信息统计绘图
+    user_id = list()
     user_total_click_times = list()
     user_total_click_days = list()
-    for _ in click_info.keys():
-        user_total_click_times.append(int(click_info["total_click_times_info"]))
-        user_total_click_days.append(int(click_info["total_click_days_info"]["_count"]))
-    plot_user_click_dist(user_total_click_times)
-    plot_user_click_dist(user_total_click_days)
+    for k in click_info.keys():
+        user_id.append(k)
+        user_total_click_times.append(int(click_info[k]["total_click_times_info"]))
+        user_total_click_days.append(int(click_info[k]["total_click_days_info"]["_count"]))
+    user_click_df = pd.DataFrame(zip(user_id, user_total_click_times, user_total_click_days), columns=["user_id", "total_click_times", "total_click_days"])
+    columns_name = ["total_click_times", "total_click_days"]
+    total_count_user = len(click_info.keys())
+    print("\ntotal user: {}".format(total_count_user))
+
+    print("--- details of click info ---")
+    print(user_click_df[columns_name].describe())
+    print("--- details of total click times(<=300) info ---")
+    print(user_click_df[columns_name][user_click_df.total_click_times<=300].describe())
+    print("--- details of total click times(>300) info ---")
+    print(user_click_df[columns_name][user_click_df.total_click_times>300].describe())
+    print("--- plot of click times---")
+    plot_user_click_dist(user_total_click_times, desc="total click times")
+    plot_user_click_dist([ct for ct in user_total_click_times if ct <= 300], desc="total click times(<=300)")
+    plot_user_click_dist([ct for ct in user_total_click_times if ct > 300], desc="total click times(>300)")
+    print("--- details of total click days(>45) info ---")
+    print(user_click_df[columns_name][user_click_df.total_click_days>45].describe())
+    # print("total user click more than 45 days: {}".format(user_click_days_df[user_click_days_df.total_click_days>45].__len__()))
+    print("--- plot of click days---")
+    plot_user_click_dist(user_total_click_days, desc="total click days")
+    print("--- details of total click times(>100) and days(>60) info ---")
+    print(user_click_df[columns_name][(user_click_df.total_click_times>100) & (user_click_df.total_click_days>60)].describe())
+
+
 
 def write_click_analysis_details_to_file(file, outfile):
     print("start writing click analysis details to file: {}".format(outfile))
@@ -255,18 +281,117 @@ def write_click_analysis_details_to_file(file, outfile):
     return click_info
 
 
-ad_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad.csv"
-ad_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad_analysis.json"
+def load_user_info(file):
+    print("load user info from file: {}".format(file))
+    user_info = dict()
+    for line in read_data_from_csv_file(file):
+        if line[0] not in user_info:
+            user_info[line[0]] = dict()
+            user_info[line[0]]["age"] = int(line[1])
+            user_info[line[0]]["gender"] = int(line[2])
+        else:
+            print("exist user id {}".format(line[0]))
+    return user_info
 
-user_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user.csv"
-user_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user_analysis.json"
-click_log_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log.csv"
-click_log_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log_analysis.json"
+def load_ad_info(file):
+    print("load ad info from file: {}".format(file))
+    ad_info = dict()
+    for line in read_data_from_csv_file(file):
+        if line[0] not in ad_info:
+            ad_info[line[0]] = []
+            ad_info[line[0]].append(int(line[1]))
+            ad_info[line[0]].append(int(line[2]) if line[2] != "\\N" else None)
+            ad_info[line[0]].append(int(line[3]))
+            ad_info[line[0]].append(int(line[4]))
+            ad_info[line[0]].append(int(line[5]) if line[5] != "\\N" else None)
+        else:
+            print("exist creative id {}".format(line[0]))
+    return ad_info
 
-# analysis_ad(ad_data_file, ad_data_analysis_file)
-# analysis_user(user_data_file, user_data_analysis_file)
-analysis_click(click_log_data_file, click_log_data_analysis_file)
 
-# user_data = read_data_from_csv(user_data_file)
-#
-# click_log_data = read_data_from_csv(click_log_data_file)
+def load_click_info(file):
+    print("load click info from file: {}".format(file))
+    _count = 0
+    seq_data = dict()
+    for line in read_data_from_csv_file(file):
+        _count += 1
+        if _count < 6:
+            print(line)
+        # else:
+        #     break
+        # 用户点击信息
+        if line[1] in seq_data:
+            seq_data[line[1]]["click_seq"][int(line[0]) - 1].append((line[2], int(line[3])))
+        else:
+            seq_data[line[1]] = dict()
+            seq_list = [[] for _ in range(91)]
+            seq_data[line[1]]["click_seq"] = seq_list
+            seq_data[line[1]]["click_seq"][int(line[0])-1].append((line[2], int(line[3])))
+
+    return seq_data
+
+
+def gen_data(click_file, ad_file, user_file, train_file):
+    ad_info = load_ad_info(ad_file)
+    user_info = load_user_info(user_file)
+    click_info = load_click_info(click_file)
+    with open(train_file, "w", encoding="utf-8") as f:
+        for user_id, v in click_info.items():
+            line = dict()
+            line["user_id"] = user_id
+            click_seq = v["click_seq"]
+            line["ad_id_seq"] = list()
+            line["product_id_seq"] = list()
+            line["product_category_seq"] = list()
+            line["advertiser_id_seq"] = list()
+            line["industry_seq"] = list()
+            line["click_times_seq"] = list()
+            if user_id in user_info:
+                line["age"] = user_info[user_id]["age"]
+                line["gender"] = user_info[user_id]["gender"]
+            else:
+                line["age"] = None
+                line["gender"] = None
+            for click in click_seq:
+                ad_click = [[], [], [], [], []]
+                click_times = []
+                if click:
+                    creative_id = click[0]
+                    click_times = click[1]
+                    if creative_id in ad_info:
+                        ad_click = ad_info[creative_id]
+
+                line["ad_id_seq"].append(ad_click[0])
+                line["product_id_seq"].append(ad_click[1])
+                line["product_category_seq"].append(ad_click[2])
+                line["advertiser_id_seq"].append(ad_click[3])
+                line["industry_seq"].append(ad_click[4])
+                line["click_times_seq"].apppend(click_times)
+
+            f.write(json.dumps(line) + "\n")
+
+
+
+def main():
+    ad_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad.csv"
+    ad_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad_analysis.json"
+
+    user_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user.csv"
+    user_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/user_analysis.json"
+    click_log_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log.csv"
+    click_log_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/click_log_analysis.json"
+
+    train_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/train.txt"
+
+    # analysis_ad(ad_data_file, ad_data_analysis_file)
+    # analysis_user(user_data_file, user_data_analysis_file)
+    # analysis_click(click_log_data_file, click_log_data_analysis_file)
+
+    # user_data = read_data_from_csv(user_data_file)
+    #
+    # click_log_data = read_data_from_csv(click_log_data_file)
+    gen_data(click_log_data_file, ad_data_file, user_data_file, train_file)
+
+
+if __name__ == "__main__":
+    main()
