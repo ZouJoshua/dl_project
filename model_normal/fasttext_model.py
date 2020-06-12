@@ -49,10 +49,10 @@ class Config(object):
         self.all_params["bucket"] = config.getint("bucket", 2000)
         self.all_params["thread"] = config.getint("thread", 12)
         self.all_params["minCountLabel"] = config.getint("minCountLabel", 0)
-        self.all_params["neg"] = config.getint("neg")
+        self.all_params["neg"] = config.getint("neg", 5)
         self.all_params["t"] = config.getfloat("t", 1e-4)
         self.all_params["verbose"] = config.getint("verbose", 2)
-        self.all_params["pretrainedVectors"] = config.get("pretrainedVectors", "")
+        self.all_params["pretrainedVectors"] = config.get("pretrainedVectors", None)
 
 
 
