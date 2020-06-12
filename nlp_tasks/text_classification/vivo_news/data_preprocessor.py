@@ -108,8 +108,8 @@ class PreCorpus(object):
         print("test_label_count: {}".format(json.dumps(test_label_count, indent=4, ensure_ascii=False)))
         # train = [y[i] + "\t" + x[i] for i in index[0][0]]
         # dev = [y[j] + "\t" + x[j] for j in index[0][1]]
-        train = [y[i] + "\t__label__" + x[i] for i in index[0][0]]
-        dev = [y[j] + "\t__label__" + x[j] for j in index[0][1]]
+        train = [x[i] + "\t__label__" + y[i] for i in index[0][0]]
+        dev = [x[j] + "\t__label__" + y[j] for j in index[0][1]]
 
         return train, dev
 

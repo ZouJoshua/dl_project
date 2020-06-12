@@ -52,7 +52,7 @@ class Config(object):
         self.all_params["neg"] = config.getint("neg", 5)
         self.all_params["t"] = config.getfloat("t", 1e-4)
         self.all_params["verbose"] = config.getint("verbose", 2)
-        self.all_params["pretrainedVectors"] = config.get("pretrainedVectors", None)
+        # self.all_params["pretrainedVectors"] = config.get("pretrainedVectors", None)
 
 
 
