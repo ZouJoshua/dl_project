@@ -75,6 +75,7 @@ class FastTextClassifier:
             self.log = logging.getLogger("fasttext_train_log")
             logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s')
             logging.root.setLevel(level=logging.INFO)
+        self.log.info("训练参数：{}".format(json.dumps(self.args, indent=4)))
 
         if name_mark:
             self.model_file = os.path.join(model_path, "{}classification.bin".format(name_mark))
