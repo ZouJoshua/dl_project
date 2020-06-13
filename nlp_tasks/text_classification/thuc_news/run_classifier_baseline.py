@@ -45,7 +45,7 @@ def participle_train():
 
 
 def single_char_train():
-    config_file = os.path.join(CONFIG_PATH, "fasttext_train.conf")
+    config_file = os.path.join(CONFIG_PATH, "fasttext.conf")
     config_section = "fasttext.args_thuc_news_single_char"
     corpus_path = os.path.join(DATA_PATH, "corpus", "thuc_news")
     model_path = os.path.join(DATA_PATH, "model", "thuc_news")

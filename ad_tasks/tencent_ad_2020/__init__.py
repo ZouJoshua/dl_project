@@ -3,7 +3,7 @@
 """
 @Author  : Joshua
 @Time    : 5/15/20 5:25 PM
-@File    : __init__.py.py
+@File    : __init__.py
 @Desc    : 
 
 """
