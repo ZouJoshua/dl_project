@@ -372,6 +372,8 @@ def gen_data(click_file, ad_file, user_file, train_file):
 
 
 
+
+
 def main():
     ad_data_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad.csv"
     ad_data_analysis_file = "/data/work/dl_project/data/corpus/tencent_ad_2020/train_preliminary/ad_analysis.json"
