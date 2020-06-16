@@ -65,10 +65,9 @@ class PreCorpus(object):
                 clean_title_obj = CleanDoc(title)
                 clean_content_obj = CleanDoc(content)
                 # 获取title和content的char特征
-                # char_feature = " ".join(list(clean_title_obj.char_feature)) + " ### " + " ".join(list(clean_content_obj.char_feature))
+                char_feature = " ".join(list(clean_title_obj.char_feature)) + " ### " + " ".join(list(clean_content_obj.char_feature))
                 # 获取title和content的token特征
-                # token_feature = " ".join(list(clean_title_obj.token_feature)) + " ### " + " ".join(list(clean_content_obj.token_feature))
-                token_feature = " ".join(list(clean_title_obj.token_feature)) + " " + " ".join(list(clean_content_obj.token_feature))
+                token_feature = " ".join(list(clean_title_obj.token_feature)) + " ### " + " ".join(list(clean_content_obj.token_feature))
 
                 if len(content) > 30:
                     if label in _count.keys():
@@ -76,13 +75,11 @@ class PreCorpus(object):
                             continue
                         else:
                             _count[label] += 1
-                            # X.append(token_feature + "\t" + char_feature + "\t" + channel)
-                            X.append(token_feature)
+                            X.append(token_feature + "\t" + char_feature + "\t" + channel)
                             Y.append(label)
                     else:
                         _count[label] = 1
-                        # X.append(token_feature + "\t" + char_feature + "\t" + channel)
-                        X.append(token_feature)
+                        X.append(token_feature + "\t" + char_feature + "\t" + channel)
                         Y.append(label)
                 else:
                     continue
@@ -106,10 +103,8 @@ class PreCorpus(object):
         test_label_count = self._label_count([y[j] for j in index[0][1]])
         print("train_label_count: {}".format(json.dumps(train_label_count, indent=4, ensure_ascii=False)))
         print("test_label_count: {}".format(json.dumps(test_label_count, indent=4, ensure_ascii=False)))
-        # train = [y[i] + "\t" + x[i] for i in index[0][0]]
-        # dev = [y[j] + "\t" + x[j] for j in index[0][1]]
-        train = [x[i] + "\t__label__" + y[i] for i in index[0][0]]
-        dev = [x[j] + "\t__label__" + y[j] for j in index[0][1]]
+        train = [y[i] + "\t" + x[i] for i in index[0][0]]
+        dev = [y[j] + "\t" + x[j] for j in index[0][1]]
 
         return train, dev
 
@@ -302,9 +297,8 @@ class CleanDoc(object):
         no_html = self.clean_url(_text)
         no_mail = self.clean_mail(no_html)
         no_emoji = self.remove_emoji(no_mail)
-        _text = re.sub(r"\s+", " ", no_emoji)
-        return sentence
-
+        text = re.sub(r"\s+", " ", no_emoji)
+        return text
 
     def clean_cn_text_by_third_party(self, sentence):
         """
@@ -314,8 +308,8 @@ class CleanDoc(object):
         ht_obj = HarvestText()
         # 去掉微博的@，表情符；网址；email；html代码中的一类的特殊字符等
         _text = sentence.replace('\u2028', '').replace('\n', '').replace('\t', '')
-        re_h = re.compile('<(/?\w+|!--|!DOCTYPE|\?xml)[^>]*>')
-        _text = re_h.sub('', _text)  # html处理
+        re_h = re.compile("<(/?\w+|!--|!DOCTYPE|\?xml)[^>]*>")
+        _text = re_h.sub("", _text)  # html处理
         clean_text = ht_obj.clean_text(_text)
         return clean_text
 
@@ -448,11 +442,235 @@ class CleanDoc(object):
         text = text.translate(remove_punctuation_map)  # 去掉ASCII 标点符号
         return text
 
+class PrePublicCorpus(object):
+    """
+    将公开数据集处理为模型训练数据
+    """
+
+    def __init__(self, corpus_file, out_dir):
+        if not os.path.exists(corpus_file):
+            raise FileNotFoundError
+        self.corpus_file = corpus_file
+        self.train_file = os.path.join(out_dir, "train.txt")
+        self.dev_file = os.path.join(out_dir, "validate.txt")
+        self.test_file = os.path.join(out_dir, "test.txt")
+        # self.analysis_label_dist()
+        self.get_category_corpus_file()
+
+    def get_category_corpus_file(self):
+        print(">>>>> preprocess corpus")
+        X, Y = self.get_clean_data(category_level=1)
+        train, dev = self.stratified_sampling(X, Y, 0.2)
+        self.write_txt_file(train, self.train_file)
+        self.write_txt_file(dev, self.dev_file)
+        self.write_txt_file(dev, self.test_file)
+
+    def get_clean_data(self, category_level=1):
+        X = list()
+        Y = list()
+        _count = dict()
+        for line in self.read_json_format_file(self.corpus_file):
+            if line:
+                (_id, channel, title, content), y = self._preline(line)
+                label = y[category_level - 1]
+                clean_title_obj = CleanDoc(title)
+                clean_content_obj = CleanDoc(content)
+                # 获取title和content的char特征
+                char_feature = " ".join(list(clean_title_obj.char_feature)) + " ### " + " ".join(
+                    list(clean_content_obj.char_feature))
+                # 获取title和content的token特征
+                token_feature = " ".join(list(clean_title_obj.token_feature)) + " ### " + " ".join(
+                    list(clean_content_obj.token_feature))
+
+                if len(title) > 10:
+                    if label in _count.keys():
+                        if _count[label] > 10000:
+                            continue
+                        else:
+                            _count[label] += 1
+                            X.append(token_feature + "\t" + char_feature + "\t" + channel)
+                            Y.append(label)
+                    else:
+                        _count[label] = 1
+                        X.append(token_feature + "\t" + char_feature + "\t" + channel)
+                        Y.append(label)
+                else:
+                    continue
+        return X, Y
+
+    def stratified_sampling(self, x, y, valid_portion):
+        """
+        按标签类别个数分层切分训练集和验证集
+        :param x:
+        :param y:
+        :param valid_portion:
+        :return:
+        """
+        skf = StratifiedKFold(n_splits=int(1 / valid_portion))
+        train = None
+        dev = None
+
+        index = [(train_index, test_index) for train_index, test_index in skf.split(x, y)]
+
+        train_label_count = self._label_count([y[i] for i in index[0][0]])
+        test_label_count = self._label_count([y[j] for j in index[0][1]])
+        print("train_label_count: {}".format(json.dumps(train_label_count, indent=4, ensure_ascii=False)))
+        print("test_label_count: {}".format(json.dumps(test_label_count, indent=4, ensure_ascii=False)))
+        train = [y[i] + "\t" + x[i] for i in index[0][0]]
+        dev = [y[j] + "\t" + x[j] for j in index[0][1]]
+
+        return train, dev
+
+    def _label_dist_count(self, level1=None, level2=None, level3=None, dist_count=None):
+        """
+        统计标签分布计算
+        :param level1:一级标签
+        :param level2:二级标签
+        :param level3:三级标签
+        :param dist_count:标签分布字典
+        :return:
+        """
+        if level1:
+            if level1 in dist_count:
+                dist_count[level1]["count"] += 1
+            else:
+                dist_count[level1] = dict()
+                dist_count[level1]["count"] = 1
+            if level2:
+                if level2 in dist_count[level1]:
+                    dist_count[level1][level2]["count"] += 1
+                else:
+                    dist_count[level1][level2] = dict()
+                    dist_count[level1][level2]["count"] = 1
+                if level3:
+                    if level3 in dist_count[level1][level2]:
+                        dist_count[level1][level2][level3] += 1
+                    else:
+                        dist_count[level1][level2][level3] = 1
+
+    @staticmethod
+    def dict_sort(result, limit_num=None):
+        """
+        字典排序, 返回有序字典
+        :param result:
+        :param limit_num:
+        :return:
+        """
+        _result_sort = sorted(result.items(), key=lambda x: x[1]["count"], reverse=True)
+        result_sort = OrderedDict()
+
+        count_limit = 0
+        domain_count = 0
+        for i in _result_sort:
+            if limit_num:
+                if i[1] > limit_num:
+                    result_sort[i[0]] = i[1]
+                    domain_count += 1
+                    count_limit += i[1]
+            else:
+                result_sort[i[0]] = i[1]
+        return result_sort
+
+    @staticmethod
+    def _preline(line):
+        """
+        处理文件行（dict格式）
+        """
+        article_id = ""
+        channel = "thuc_news"
+        title = line.get("text", "")
+        content = ""
+        top_category = line.get("label", "")
+        sub_category = ""
+        third_category = ""
+        return (article_id, channel, title, content), (top_category, sub_category, third_category)
+
+    def _label_count(self, label_list):
+        label_count = dict()
+        for i in label_list:
+            if label_count.get(i, None) is not None:
+                label_count[i] += 1
+            else:
+                label_count[i] = 1
+        return label_count
+
+    @staticmethod
+    def read_json_format_file(file):
+        """
+        读取每行为json格式的文本
+        :param file: 文件名
+        :return: 每行文本
+        """
+        if not os.path.exists(file):
+            raise FileNotFoundError("file {} not found.".format(file))
+        print(">>>>> reading file：{}".format(file))
+        line_count = 0
+        with open(file, 'r') as f:
+            while True:
+                _line = f.readline()
+                line_count += 1
+                if not _line:
+                    break
+                else:
+                    line = json.loads(_line.strip())
+                    # line = eval(_line.strip())
+                    if line_count % 100000 == 0:
+                        print(">>>>> read {} lines.".format(line_count))
+                    yield line
+
+    def write_txt_file(self, data, file):
+        """
+        写数据到文件
+        """
+        print(">>>>> start writing file")
+        with open(file, "w") as f:
+            for line in data:
+                f.write(line + "\n")
+        print("<<<<< write down：{}".format(file))
+
+
+
 def pre_process():
     data_file = "/Users/vivo/work/data/corpus_data"
-    from setting import DATA_PATH
-    out_dir = os.path.join(DATA_PATH, "corpus", "vivo_news")
+    out_dir = "./data"
     PreCorpus(data_file, out_dir)
+
+def pre_public_process():
+    data_file = "/Users/vivo/work/code_space/deeptext_neuralclassifier/test_data/thuc_news.title.train.txt"
+    out_dir = "./test_data"
+    PrePublicCorpus(data_file, out_dir)
+    # sample_file = "./thuc_news_sample"
+    # count = dict()
+    # with open(sample_file, "w", encoding="utf-8") as wf:
+    #     with open(data_file, "r", encoding="utf-8") as f:
+    #         for l in f.readlines():
+    #             line = json.loads(l.strip())
+    #             label = line["label"]
+    #             if label in count:
+    #                 count[label] += 1
+    #             else:
+    #                 count[label] = 1
+    #             if count[label] < 10001:
+    #                 wf.write(l)
+
+def pre_public_preocess_to_fasttext():
+    data_dir = "/Users/vivo/work/code_space/deeptext_neuralclassifier/test_data"
+    ori_train_file = os.path.join(data_dir, "train.txt")
+    ori_test_file = os.path.join(data_dir, "test.txt")
+    from setting import DATA_PATH
+    ft_train_file = os.path.join(DATA_PATH, "common", "test_sample", "train.txt")
+    ft_test_file = os.path.join(DATA_PATH, "common", "test_sample", "test.txt")
+
+    def write_data_to_fasttext_file(ori_file, ft_file):
+        with open(ft_file, "w", encoding="utf-8") as wf:
+            with open(ori_file, "r", encoding="utf-8") as f:
+                for line in f.readlines():
+                    label, token, char, channel = line.strip().split("\t")
+                    ft_line = token.split(" ### ")[0] + "\t__label__" + label
+                    wf.write(ft_line + "\n")
+    write_data_to_fasttext_file(ori_train_file, ft_train_file)
+    write_data_to_fasttext_file(ori_test_file, ft_test_file)
+
 
 def clean_text_demo():
     title = "搞笑GIF：聪明人一看就知道怎么做到的！"
@@ -464,5 +682,7 @@ def clean_text_demo():
 
 
 if __name__ == "__main__":
-    pre_process()
+    # pre_public_process()
+    pre_public_preocess_to_fasttext()
+    # pre_process()
     # clean_text_demo()

@@ -24,7 +24,7 @@ def merge_files(data_dir, outfile):
     """
     合并原始文件到一个文件
     每行一个格式为{"text":"","label":""}
-    :param dir:解压后的文件目录路径
+    :param data_dir:解压后的文件目录路径
     :return:
     """
     print("合并所有文件文本到一个文件")

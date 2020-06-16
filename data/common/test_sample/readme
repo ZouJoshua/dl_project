@@ -1,1 +1,9 @@
 # 个人整理的用于测试模型结构的数据用例
+# sogou_news,搜狗新闻（短文本，标题）
+sogou_news_sample
+
+# toutiao_news,头条新闻（短文本，标题）
+toutiao_news_sample
+
+# thuc_news，清华新闻（短文本，标题，10W个样本，每个样本大约1W，总共）
+thuc_news_sample
