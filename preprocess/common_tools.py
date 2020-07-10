@@ -15,6 +15,8 @@ import re
 import string
 import emoji
 import time
+import xlrd
+from openpyxl import load_workbook
 
 
 def read_data_from_csv_file(file):
@@ -36,6 +38,34 @@ def read_data_from_csv_file(file):
             # if i < 5:
             #     print(row)
             yield row
+
+
+def read_xlrd(excel_file):
+    """
+    读取excel文件
+    :param excel_file: excel 文件
+    :return: excel默认打开的第一个sheet的表头和表
+    """
+    data = xlrd.open_workbook(excel_file)
+    table = data.sheet_by_index(0)
+    # print(table.row_values[0])
+    head = [i_name for i_name in table.row_values(0)]
+    return head, table
+
+
+def add_excel_sheet(dataframe, excel_writer, sheet_name):
+    """
+    往excel添加sheet
+    :param dataframe: datafram格式
+    :param excel_writer: excel writer
+    :param sheet_name: excel sheet name
+    :return:
+    """
+    book = load_workbook(excel_writer.path)
+    excel_writer.book = book
+    dataframe.to_excel(excel_writer=excel_writer, sheet_name=sheet_name)
+    excel_writer.close()
+
 
 
 def read_json_format_file(file):
@@ -153,6 +183,7 @@ def split_text(text, lower=True, stop=None):
             _text = _text.replace(i, "")
     word_list = _text.split(" ")
     return word_list
+
 
 def dict_sort(result, limit_num=None):
     """
