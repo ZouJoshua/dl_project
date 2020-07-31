@@ -18,3 +18,5 @@ matplotlib==3.1.1
 plotly==2.0.11
 msgpack==0.6.1
 pytest==5.0.1
+textacy==0.10.0
+polyglot==16.7.4

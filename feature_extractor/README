@@ -1,0 +1,17 @@
+ENV: python3.5
+SPEED_UP: pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple xxx
+# pip3
+sudo apt install -y pip3
+# polyglot
+sudo apt-get install python-numpy libicu-dev
+pip3 install polyglot
+# textacy
+pip3 install textacy
+# nltk
+pip3 install nltk
+
+running:
+    polyglot model path:
+        win7 > C:\Users\XXX\AppData\Roaming\polyglot_data
+        linux > /home/XXX/polyglot_data
+        both > add environment: POLYGLOT_DATA_PATH(polyglot_data's parent path)
