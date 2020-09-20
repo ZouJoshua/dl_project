@@ -6,11 +6,19 @@
 @File    : logger.py
 @Desc    : log
 """
+
+import os
 import logging
 import logging.handlers
 import sys
 import datetime
 from setting import DEFAULT_LOGGING_LEVEL, DEFAULT_LOGGING_FILE
+"""
+需要依赖 ConcurrentLogHandler 模块
+地址： https://pypi.org/project/ConcurrentLogHandler/
+"""
+from cloghandler import ConcurrentRotatingFileHandler
+
 
 
 class Logger(object):
@@ -75,8 +83,61 @@ class Logger(object):
         return self.logger
 
 
+class LoggerV2(object):
 
-class Logger_v1(object):
+    def __init__(self, log_dir):
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        # 日志按每天切分到不同的文件夹下，先检查创建文件夹
+        # 注意脚本一次执行时间过短时，是不会触发日志切割的，因此主动拆分
+        # log_dir = os.path.join(app_dir, "log")
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
+
+        info_handler = ConcurrentRotatingFileHandler(log_dir + "/info.log", "a", 1024 * 1024 * 1024 * 1, 6)
+        error_handler = ConcurrentRotatingFileHandler(log_dir + "/error.log", "a", 1024 * 1024 * 10, 5)
+        warning_handler = ConcurrentRotatingFileHandler(log_dir + "/warning.log", "a", 1024 * 1024 * 10, 5)
+
+        info_filter = InfoFilter()
+        error_filter = ErrorFilter()
+        warning_filter = WarningFilter()
+
+        info_handler.addFilter(info_filter)
+        error_handler.addFilter(error_filter)
+        warning_handler.addFilter(warning_filter)
+
+        # 设置formatter
+        fmt = "%(asctime)s [%(levelname)s] [%(process)d:%(thread)d] [%(name)s:%(lineno)d] - %(message)s"
+        formatter = logging.Formatter(fmt)  # 实例化formatter
+        info_handler.setFormatter(formatter)
+        error_handler.setFormatter(formatter)
+        warning_handler.setFormatter(formatter)
+
+        logger.addHandler(info_handler)
+        logger.addHandler(error_handler)
+        logger.addHandler(warning_handler)
+
+    @classmethod
+    def get_logger(cls, logger_name):
+        return logging.getLogger(logger_name)
+
+
+#增加日志级别过滤
+class InfoFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.INFO
+
+class ErrorFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.ERROR
+
+class WarningFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.WARNING
+
+
+class LoggerV1(object):
     """Log wrapper class
     """
 
