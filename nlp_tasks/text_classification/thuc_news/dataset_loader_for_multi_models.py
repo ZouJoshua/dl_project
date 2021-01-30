@@ -87,7 +87,7 @@ class DatasetLoader(DataBase):
         :return:
         """
         # 1，读取原始数据
-        all_data_file = os.path.join(self._data_path, "thuc_news.all.txt")
+        all_data_file = os.path.join(self._data_path, "thuc_news.title.train.txt")
         if self.word_cut:
             _clean_data_file = os.path.join(self._data_path, "thuc_news.word.all.txt")
         else:

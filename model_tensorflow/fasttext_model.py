@@ -58,6 +58,8 @@ class Fasttext(BaseModel):
             # 对词向量进行平均
             with tf.name_scope("average"):
                 self.embeddings_output = tf.reduce_mean(self.embedded_words, axis=1)
+                print(type(self.embeddings_output))
+                print(self.embeddings_output.shape)
 
 
     def full_connection_layer(self):

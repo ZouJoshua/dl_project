@@ -157,6 +157,7 @@ class BaseModel(object):
         feed_dict = {self.inputs: batch["x"],
                      self.labels: batch["y"],
                      self.keep_prob: dropout_prob}
+        print(feed_dict)
 
         # 训练模型
         _, summary, step, loss, predictions = sess.run([self.train_op, self.summary_op, self.global_step, self.loss, self.predictions],
